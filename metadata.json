@@ -1,0 +1,6 @@
+{
+  "name": "M2M Photo Bridge",
+  "description": "A background image-syncing bridge for M2M Assistant, capturing and syncing photos to Firebase Storage.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": []
+}
