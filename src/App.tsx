@@ -241,24 +241,22 @@ export default function App() {
 
   const handleHandoff = () => {
     if (!session) return;
-    const { fName, lName } = splitName(session.name);
+    const { fName: firstName, lName: lastName } = splitName(session.name);
+    const { email, phoneNumber, servicesOrdered, customernotes, sessionid, reportid1, storecode, totalAmount } = session;
     
-    const jotformUrl = new URL('https://pci.jotform.com/form/261047358857164');
-    jotformUrl.searchParams.set('sessionid', session.sessionid);
-    jotformUrl.searchParams.set('name[first]', fName);
-    jotformUrl.searchParams.set('name[last]', lName);
-    jotformUrl.searchParams.set('email', session.email);
-    jotformUrl.searchParams.set('phoneNumber', session.phoneNumber);
-    jotformUrl.searchParams.set('totalAmount', session.totalAmount);
-    jotformUrl.searchParams.set('storecode', session.storecode);
-    jotformUrl.searchParams.set('servicesOrdered', session.servicesOrdered);
+    const basePrice = parseFloat(totalAmount) || 0;
+    const formattedPrice = basePrice.toFixed(2);
 
-    window.location.href = jotformUrl.toString();
+    const jotformUrl = `https://pci.jotform.com/form/261047358857164?name[first]=${firstName}&name[last]=${lastName}&email=${email}&phoneNumber=${phoneNumber}&myProducts[price]=${formattedPrice}&totalAmount=${formattedPrice}&servicesOrdered=${encodeURIComponent(servicesOrdered)}&customernotes=${encodeURIComponent(customernotes)}&sessionid=${sessionid}&reportId1=${reportid1}&storecode=${storecode}&date=${encodeURIComponent(new Date().toLocaleString())}`;
+
+    window.location.href = jotformUrl;
   };
 
-  const allPhotosReady = photos.length > 0 && 
-                         photos.every(p => p.status === 'ready') && 
-                         !!photos.find(p => p.type === 'label');
+  const isSyncing = photos.some(p => p.status === 'syncing');
+  const hasItem = photos.some(p => p.type === 'item' && p.status === 'ready');
+  const hasLabel = photos.some(p => p.type === 'label' && p.status === 'ready');
+  const allPhotosReady = hasItem && hasLabel && !isSyncing;
+
   const itemPhotos = photos.filter(p => p.type === 'item');
   const labelPhoto = photos.find(p => p.type === 'label');
 
@@ -564,6 +562,11 @@ export default function App() {
                         <button onClick={() => removePhoto(photo.id)} className="absolute top-1 right-1 p-1 bg-black/80 rounded-full z-10 border border-white/10">
                           <Trash2 className="w-2.5 h-2.5 text-red-500" />
                         </button>
+                        {photo.status === 'ready' && (
+                          <div className="absolute top-1 left-1 p-0.5 bg-[#66FFB2] rounded-full z-10 shadow-lg">
+                            <CheckCircle2 className="w-2.5 h-2.5 text-black" />
+                          </div>
+                        )}
                         {photo.status === 'syncing' && (
                           <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
                             <Loader2 className="w-4 h-4 text-[#66FFB2] animate-spin" />
@@ -598,6 +601,11 @@ export default function App() {
                     <button onClick={() => removePhoto(labelPhoto.id)} className="absolute top-1 right-1 p-1 bg-black/80 rounded-full z-10 border border-white/10">
                       <Trash2 className="w-2.5 h-2.5 text-red-500" />
                     </button>
+                    {labelPhoto.status === 'ready' && (
+                      <div className="absolute top-1 left-1 p-0.5 bg-[#66FFB2] rounded-full z-10 shadow-lg">
+                        <CheckCircle2 className="w-2.5 h-2.5 text-black" />
+                      </div>
+                    )}
                     {labelPhoto.status === 'syncing' && (
                       <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
                         <Loader2 className="w-4 h-4 text-[#66FFB2] animate-spin" />
@@ -633,13 +641,13 @@ export default function App() {
             w-full py-5 rounded-2xl text-[13px] font-black uppercase tracking-[0.3em] transition-all relative overflow-hidden
             ${allPhotosReady 
               ? 'bg-[#66FFB2] text-white shadow-[0_0_40px_rgba(102,255,178,0.3)] active:scale-[0.98]' 
-              : 'bg-[#0A0A0A] text-[#222] border border-[#1A1A1A] cursor-not-allowed'}
+              : 'bg-[#0A0A0A] text-[#222] border border-[#1A1A1A] cursor-not-allowed text-white'}
           `}
         >
           <span className="relative z-10 whitespace-nowrap">
-            {!allPhotosReady && photos.length > 0 ? 'Syncing...' : 'Complete & Proceed'}
+            {isSyncing ? 'Syncing...' : 'Complete & Proceed'}
           </span>
-          {allPhotosReady && (
+          {isSyncing && (
             <motion.div 
               className="absolute inset-0 bg-white/30"
               animate={{ x: ['-100%', '100%'] }}
