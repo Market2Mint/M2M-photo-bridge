@@ -76,6 +76,7 @@ export default function App() {
     
     if (params.get('status') === 'success') {
       setSuccessOrderId(params.get('orderId'));
+      setPhotos([]); // Clear local cart on success
       setMode('success');
       return;
     }
@@ -247,7 +248,8 @@ export default function App() {
     const basePrice = parseFloat(totalAmount) || 0;
     const formattedPrice = basePrice.toFixed(2);
 
-    const jotformUrl = `https://pci.jotform.com/form/261047358857164?name[first]=${firstName}&name[last]=${lastName}&email=${email}&phoneNumber=${phoneNumber}&myProducts[price]=${formattedPrice}&totalAmount=${formattedPrice}&servicesOrdered=${encodeURIComponent(servicesOrdered)}&customernotes=${encodeURIComponent(customernotes)}&sessionid=${sessionid}&reportId1=${reportid1}&storecode=${storecode}&date=${encodeURIComponent(new Date().toLocaleString())}`;
+    // Standardized form URL for better redirect stability
+    const jotformUrl = `https://form.jotform.com/261047358857164?name[first]=${encodeURIComponent(firstName)}&name[last]=${encodeURIComponent(lastName)}&email=${encodeURIComponent(email)}&phoneNumber=${encodeURIComponent(phoneNumber)}&myProducts[price]=${formattedPrice}&totalAmount=${formattedPrice}&servicesOrdered=${encodeURIComponent(servicesOrdered)}&customernotes=${encodeURIComponent(customernotes)}&sessionid=${sessionid}&reportId1=${reportid1}&storecode=${storecode}&date=${encodeURIComponent(new Date().toLocaleString())}`;
 
     window.location.href = jotformUrl;
   };
@@ -640,7 +642,7 @@ export default function App() {
           className={`
             w-full py-5 rounded-2xl text-[13px] font-black uppercase tracking-[0.3em] transition-all relative overflow-hidden
             ${allPhotosReady 
-              ? 'bg-[#66FFB2] text-white shadow-[0_0_40px_rgba(102,255,178,0.3)] active:scale-[0.98]' 
+              ? 'bg-white text-black shadow-[0_0_40px_rgba(255,255,255,0.2)] active:scale-[0.98]' 
               : 'bg-[#0A0A0A] text-[#222] border border-[#1A1A1A] cursor-not-allowed text-white'}
           `}
         >
@@ -649,7 +651,7 @@ export default function App() {
           </span>
           {isSyncing && (
             <motion.div 
-              className="absolute inset-0 bg-white/30"
+              className="absolute inset-0 bg-white/10"
               animate={{ x: ['-100%', '100%'] }}
               transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
             />
