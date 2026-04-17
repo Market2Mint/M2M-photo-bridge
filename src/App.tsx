@@ -76,6 +76,32 @@ export default function App() {
     
     if (params.get('status') === 'success') {
       setSuccessOrderId(params.get('orderId'));
+      
+      // Data Recovery: Precise Parameter Mapping per Final Specs
+      const name = params.get('name') || '';
+      const totalAmount = params.get('totalAmount') || '';
+      const reportid1 = params.get('reportid1') || params.get('reportId1') || params.get('uniqueId') || '';
+      const email = params.get('email') || '';
+      const phoneNumber = params.get('phoneNumber') || '';
+      const sessionid = params.get('sessionid') || '';
+      const storecode = params.get('storecode') || '';
+
+      if (name || totalAmount || reportid1) {
+        setSession({
+          sessionid: sessionid.toUpperCase().trim(),
+          name,
+          email,
+          phoneNumber,
+          totalAmount,
+          reportid1,
+          storecode: storecode.toLowerCase().trim(),
+          date: params.get('date') || new Date().toISOString().split('T')[0],
+          servicesOrdered: params.get('servicesOrdered') || '',
+          totalamountBridge: totalAmount,
+          customernotes: params.get('customernotes') || '',
+        });
+      }
+
       setPhotos([]); // Clear local cart on success
       setMode('success');
       return;
@@ -270,84 +296,82 @@ export default function App() {
   };
 
   if (mode === 'success') {
+    const rawOrderId = session?.reportid1?.replace('M2M-', '') || 'XXXXXX';
+    
     return (
-      <div className="min-h-screen bg-black text-white font-sans flex items-center justify-center p-0 overflow-hidden relative">
-        {/* Security Watermark Overlay */}
-        <div className="fixed inset-0 z-0 opacity-[0.02] pointer-events-none flex flex-wrap gap-12 rotate-[-25deg] scale-150">
-          {Array.from({ length: 120 }).map((_, i) => (
-            <span key={i} className="text-[10px] font-black whitespace-nowrap uppercase tracking-[0.4em]">
-              OFFICIAL M2M SECURE SESSION
-            </span>
-          ))}
-        </div>
-
-        <div className="relative z-10 w-full h-screen flex flex-col items-center justify-center px-6">
-          {/* Live Security Clock - Premium Positioning */}
-          <div className="absolute top-[5vh] left-1/2 -translate-x-1/2 bg-[#0A0A0A] border border-[#66FFB2]/30 px-6 py-2 rounded-full backdrop-blur-md">
-            <p className="text-[10px] font-black text-[#66FFB2] tracking-[0.2em] uppercase whitespace-nowrap">
-              {currentTime.toLocaleDateString()} | {currentTime.toLocaleTimeString()}
+      <div className="h-screen bg-black text-white font-sans flex flex-col items-center justify-start p-0 overflow-hidden relative w-full">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#052515_0%,_#000_100%)] pointer-events-none opacity-50" />
+        
+        <div className="relative z-10 w-full flex flex-col items-center px-4 pt-8">
+          {/* Top Row: Live Clock */}
+          <div className="mb-6 py-1.5 px-6 bg-[#0A0A0A] border border-[#66FFB2]/20 rounded-full shadow-lg">
+            <p className="text-[14px] font-black text-[#66FFB2] tracking-[0.2em] font-mono">
+              {currentTime.toLocaleTimeString([], { hour12: true })}
             </p>
           </div>
 
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="w-full bg-[#080808] border border-[#1A1A1A] rounded-[32px] p-8 text-center shadow-2xl relative overflow-hidden"
-          >
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#66FFB2]/50 to-transparent" />
-            
-            <motion.div 
-              animate={{ 
-                scale: [1, 1.1, 1],
-                opacity: [0.6, 1, 0.6]
-              }}
-              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-              className="w-20 h-20 bg-[#66FFB2]/5 rounded-full flex items-center justify-center mx-auto mb-6"
-            >
-              <CheckCircle2 className="w-12 h-12 text-[#66FFB2]" />
-            </motion.div>
-            
-            <h1 className="text-2xl font-black tracking-tight mb-2 uppercase text-[#66FFB2] whitespace-nowrap">Order Finalized</h1>
-            <p className="text-gray-500 text-[9px] mb-8 uppercase tracking-[0.2em] font-black opacity-60">Follow these final steps before leaving:</p>
-            
-            <div className="space-y-3 mb-8 text-left">
-              {[
-                { icon: User, text: "Show this screen to the Shop Attendant." },
-                { icon: Edit3, text: "Write the DIGITS ONLY clearly on your label." },
-                { icon: Shield, text: "Ensure your box is fully secured and taped." }
-              ].map((step, i) => (
-                <div key={i} className="flex items-center gap-4 bg-black/40 p-4 rounded-2xl border border-[#111]">
-                  <div className="w-8 h-8 bg-[#66FFB2]/10 rounded-lg flex items-center justify-center shrink-0">
-                    <step.icon className="w-4 h-4 text-[#66FFB2]" />
-                  </div>
-                  <p className="text-[12px] font-bold text-gray-300 leading-tight">{step.text}</p>
-                </div>
-              ))}
-            </div>
+          {/* Static Primary Instruction */}
+          <div className="mb-6 w-full px-2">
+            <p className="text-[17px] font-black text-emerald-400 uppercase tracking-tighter text-center leading-tight">
+              SHOW THIS SCREEN TO THE SHOP ATTENDANT
+            </p>
+          </div>
 
-            <div className="bg-black rounded-2xl p-6 border border-[#222] mb-4">
-              <p className="text-[14px] font-black text-white uppercase tracking-tight mb-1">{session?.name || 'VERIFIED CUSTOMER'}</p>
-              <p className="text-[9px] font-bold text-gray-600 uppercase tracking-widest mb-4">{obfuscateEmail(session?.email || '')}</p>
-              <div className="h-px bg-[#111] w-full mb-4" />
-              <p className="text-[9px] text-gray-600 uppercase tracking-[0.4em] mb-2 font-black">Order ID Reference</p>
-              <motion.p 
-                animate={{ textShadow: ["0 0 5px rgba(102,255,178,0)", "0 0 15px rgba(102,255,178,0.4)", "0 0 5px rgba(102,255,178,0)"] }}
-                transition={{ duration: 3, repeat: Infinity }}
-                className="text-[40px] font-black text-[#66FFB2] leading-none tracking-tighter"
-              >
-                M2M-{successOrderId || 'XXXXXX'}
-              </motion.p>
-            </div>
+          {/* The Six-Digit 'Heavy Beat' Hero Focus */}
+          <motion.div 
+            animate={{ 
+              scale: [1, 1.02, 1],
+              textShadow: [
+                "0 0 0px rgba(102,255,178,0)",
+                "0 0 20px rgba(102,255,178,0.4)",
+                "0 0 0px rgba(102,255,178,0)"
+              ]
+            }}
+            transition={{ 
+              duration: 1.5, 
+              repeat: Infinity, 
+              ease: "easeInOut" 
+            }}
+            className="w-full bg-[#111] border-2 border-[#66FFB2]/50 rounded-[40px] py-10 mb-6 shadow-[0_0_60px_rgba(102,255,178,0.2)] text-center relative overflow-hidden"
+          >
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#66FFB2] to-transparent" />
+            <p className="text-[11px] font-bold text-[#66FFB2]/60 uppercase tracking-[0.6em] mb-3">Order Code Verified</p>
+            <h2 className="text-[72px] sm:text-[85px] font-black text-white leading-none tracking-tight">
+              {rawOrderId}
+            </h2>
           </motion.div>
 
-          <div className="fixed bottom-0 left-0 right-0 p-6 bg-black">
-            <button 
-              onClick={() => window.location.href = '/'}
-              className="w-full py-5 bg-[#66FFB2] text-black rounded-2xl font-black uppercase tracking-[0.2em] text-sm shadow-[0_0_30px_rgba(102,255,178,0.2)] active:scale-95 transition-transform"
-            >
-              Finish
-            </button>
+          {/* Condensed Secondary Data Pills - Full Width */}
+          <div className="w-full space-y-2 mb-8">
+            <div className="bg-[#0A0A0A] border border-white/5 py-3 px-6 rounded-2xl flex justify-between items-center w-full">
+              <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Verified Customer</span>
+              <span className="text-[17px] font-black text-white uppercase tracking-tight">{session?.name || 'Authorized'}</span>
+            </div>
+            
+            <div className="bg-[#0A0A0A] border border-white/5 py-3 px-6 rounded-2xl flex justify-between items-center w-full">
+              <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Total Paid</span>
+              <span className="text-[24px] font-black text-[#66FFB2] tracking-tighter">
+                ${parseFloat(session?.totalAmount || '0').toFixed(2)}
+              </span>
+            </div>
           </div>
+
+          {/* Minimalist Checklist One-Liners */}
+          <div className="w-full space-y-2.5 px-2">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+              <p className="text-[13px] font-bold text-gray-400 uppercase tracking-[0.05em]">Write the {rawOrderId.length} digits above on your label</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+              <p className="text-[13px] font-bold text-gray-400 uppercase tracking-[0.05em]">Hand your secured box to staff</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Dynamic Security Heartbeat - Fixed Bottom Watermark */}
+        <div className="absolute bottom-6 left-0 right-0 text-center opacity-40">
+          <p className="text-[9px] font-black text-[#66FFB2] uppercase tracking-[0.7em]">Active Security Protocol Enabled</p>
         </div>
       </div>
     );
