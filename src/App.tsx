@@ -62,6 +62,8 @@ export default function App() {
     phone: '',
   });
 
+  const [cameraError, setCameraError] = useState<string | null>(null);
+
   const webcamRef = useRef<Webcam>(null);
 
   useEffect(() => {
@@ -450,7 +452,7 @@ export default function App() {
         <div className="w-10" /> {/* Spacer */}
       </header>
 
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 flex flex-col overflow-hidden relative">
         {/* Taller Viewfinder */}
         <div className="relative h-[55vh] w-full bg-[#080808] border-b border-[#1A1A1A] overflow-hidden shrink-0 z-30">
           <Webcam
@@ -459,13 +461,30 @@ export default function App() {
             playsInline
             ref={webcamRef}
             screenshotFormat="image/webp"
+            onUserMedia={() => setCameraError(null)}
+            onUserMediaError={(err: any) => {
+              console.error("Camera Error:", err);
+              setCameraError(err.toString());
+            }}
             videoConstraints={{
               facingMode: { ideal: "environment" },
-              width: { ideal: 1920 },
-              height: { ideal: 1080 }
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
             }}
             className="w-full h-full object-cover"
           />
+          
+          {cameraError && (
+            <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center p-6 text-center z-50">
+              <Camera className="w-12 h-12 text-red-500 mb-4 opacity-50" />
+              <p className="text-red-500 font-black uppercase tracking-widest text-[10px] mb-2">Camera Access Failed</p>
+              <p className="text-gray-400 text-[8px] uppercase tracking-wider max-w-[200px] leading-relaxed">
+                {cameraError.includes('NotAllowedError') 
+                  ? 'Please enable camera permissions in your browser settings and refresh.' 
+                  : 'Your device may not support the requested camera mode. Try refreshing the app.'}
+              </p>
+            </div>
+          )}
           
           {/* Action Overlay / Control Shelf */}
           <div className="absolute inset-x-0 bottom-0 bg-black/95 pt-8 pb-4 flex flex-col items-center gap-4 px-6 border-t border-white/5 shadow-[0_-20px_40px_rgba(0,0,0,0.8)]">
