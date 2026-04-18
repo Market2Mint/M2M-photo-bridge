@@ -283,7 +283,7 @@ export default function App() {
   const isSyncing = photos.some(p => p.status === 'syncing');
   const hasItem = photos.some(p => p.type === 'item' && p.status === 'ready');
   const hasLabel = photos.some(p => p.type === 'label' && p.status === 'ready');
-  const allPhotosReady = hasItem && hasLabel && !isSyncing;
+  const allPhotosReady = (hasItem || hasLabel) && !isSyncing;
 
   const itemPhotos = photos.filter(p => p.type === 'item');
   const labelPhoto = photos.find(p => p.type === 'label');
@@ -296,22 +296,26 @@ export default function App() {
   };
 
   if (mode === 'success') {
-    const rawOrderId = session?.reportid1?.replace('M2M-', '') || 'XXXXXX';
+    const params = new URLSearchParams(window.location.search);
+    // Precise Mapping per Final Specification: reportid1, name, totalAmount
+    const displayId = (params.get('reportid1') || params.get('reportId1') || session?.reportid1 || '000000').replace('M2M-', '');
+    const displayName = params.get('name') || session?.name || 'Customer Verified';
+    const displayTotal = params.get('totalAmount') || session?.totalAmount || '0.00';
     
     return (
-      <div className="h-screen bg-black text-white font-sans flex flex-col items-center justify-start p-0 overflow-hidden relative w-full">
+      <div className="h-screen w-full bg-black text-white font-sans flex flex-col items-center justify-start p-0 overflow-hidden relative">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#052515_0%,_#000_100%)] pointer-events-none opacity-50" />
         
-        <div className="relative z-10 w-full flex flex-col items-center px-4 pt-8">
+        <div className="relative z-10 w-full flex flex-col items-center px-4 pt-6">
           {/* Top Row: Live Clock */}
-          <div className="mb-6 py-1.5 px-6 bg-[#0A0A0A] border border-[#66FFB2]/20 rounded-full shadow-lg">
+          <div className="mb-4 py-1.5 px-6 bg-[#0A0A0A] border border-[#66FFB2]/20 rounded-full shadow-lg">
             <p className="text-[14px] font-black text-[#66FFB2] tracking-[0.2em] font-mono">
               {currentTime.toLocaleTimeString([], { hour12: true })}
             </p>
           </div>
 
-          {/* Static Primary Instruction */}
-          <div className="mb-6 w-full px-2">
+          {/* Static Primary Instruction - No Pulse */}
+          <div className="mb-4 w-full px-2">
             <p className="text-[17px] font-black text-emerald-400 uppercase tracking-tighter text-center leading-tight">
               SHOW THIS SCREEN TO THE SHOP ATTENDANT
             </p>
@@ -320,58 +324,67 @@ export default function App() {
           {/* The Six-Digit 'Heavy Beat' Hero Focus */}
           <motion.div 
             animate={{ 
-              scale: [1, 1.02, 1],
-              textShadow: [
-                "0 0 0px rgba(102,255,178,0)",
-                "0 0 20px rgba(102,255,178,0.4)",
-                "0 0 0px rgba(102,255,178,0)"
+              scale: [1, 1.05, 1],
+              boxShadow: [
+                "0 0 10px rgba(102,255,178,0.1)",
+                "0 0 50px rgba(102,255,178,0.4)",
+                "0 0 10px rgba(102,255,178,0.1)"
+              ],
+              borderColor: [
+                "rgba(102,255,178,0.2)",
+                "rgba(102,255,178,0.8)",
+                "rgba(102,255,178,0.2)"
               ]
             }}
             transition={{ 
-              duration: 1.5, 
+              duration: 1.2, 
               repeat: Infinity, 
               ease: "easeInOut" 
             }}
-            className="w-full bg-[#111] border-2 border-[#66FFB2]/50 rounded-[40px] py-10 mb-6 shadow-[0_0_60px_rgba(102,255,178,0.2)] text-center relative overflow-hidden"
+            className="w-full bg-[#080808] border-2 rounded-[40px] py-8 mb-6 text-center relative overflow-hidden flex flex-col items-center justify-center"
           >
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#66FFB2] to-transparent" />
-            <p className="text-[11px] font-bold text-[#66FFB2]/60 uppercase tracking-[0.6em] mb-3">Order Code Verified</p>
-            <h2 className="text-[72px] sm:text-[85px] font-black text-white leading-none tracking-tight">
-              {rawOrderId}
+            <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-[#66FFB2] to-transparent" />
+            <p className="text-[11px] font-black text-[#66FFB2]/50 uppercase tracking-[0.7em] mb-4">Verification Active</p>
+            <h2 className="text-[75px] sm:text-[95px] font-black text-white leading-none tracking-tight block w-full px-2 break-all overflow-hidden">
+              {displayId}
             </h2>
           </motion.div>
 
-          {/* Condensed Secondary Data Pills - Full Width */}
-          <div className="w-full space-y-2 mb-8">
-            <div className="bg-[#0A0A0A] border border-white/5 py-3 px-6 rounded-2xl flex justify-between items-center w-full">
+          {/* Condensed Secondary Data Pills - Full Screen Width */}
+          <div className="w-full space-y-2 mb-6 px-1">
+            <div className="bg-[#0A0A0A] border border-white/5 py-3 px-6 rounded-2xl flex justify-between items-center w-full shadow-2xl">
               <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Verified Customer</span>
-              <span className="text-[17px] font-black text-white uppercase tracking-tight">{session?.name || 'Authorized'}</span>
+              <span className="text-[18px] font-black text-white uppercase tracking-tight">{displayName}</span>
             </div>
             
-            <div className="bg-[#0A0A0A] border border-white/5 py-3 px-6 rounded-2xl flex justify-between items-center w-full">
+            <div className="bg-[#0A0A0A] border border-white/5 py-3 px-6 rounded-2xl flex justify-between items-center w-full shadow-2xl">
               <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Total Paid</span>
-              <span className="text-[24px] font-black text-[#66FFB2] tracking-tighter">
-                ${parseFloat(session?.totalAmount || '0').toFixed(2)}
+              <span className="text-[26px] font-black text-[#66FFB2] tracking-tighter">
+                ${parseFloat(displayTotal).toFixed(2)}
               </span>
             </div>
           </div>
 
           {/* Minimalist Checklist One-Liners */}
-          <div className="w-full space-y-2.5 px-2">
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-              <p className="text-[13px] font-bold text-gray-400 uppercase tracking-[0.05em]">Write the {rawOrderId.length} digits above on your label</p>
+          <div className="w-full space-y-3 px-4">
+            <div className="flex items-center gap-4">
+              <div className="p-1 bg-emerald-500/10 rounded-full">
+                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+              </div>
+              <p className="text-[14px] font-bold text-gray-400 uppercase tracking-wide">Write the {displayId.length} digits on your label</p>
             </div>
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-              <p className="text-[13px] font-bold text-gray-400 uppercase tracking-[0.05em]">Hand your secured box to staff</p>
+            <div className="flex items-center gap-4">
+              <div className="p-1 bg-emerald-500/10 rounded-full">
+                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+              </div>
+              <p className="text-[14px] font-bold text-gray-400 uppercase tracking-wide">Hand your secured box to staff</p>
             </div>
           </div>
         </div>
 
         {/* Dynamic Security Heartbeat - Fixed Bottom Watermark */}
-        <div className="absolute bottom-6 left-0 right-0 text-center opacity-40">
-          <p className="text-[9px] font-black text-[#66FFB2] uppercase tracking-[0.7em]">Active Security Protocol Enabled</p>
+        <div className="absolute bottom-8 left-0 right-0 text-center opacity-40">
+          <p className="text-[9px] font-black text-[#66FFB2] uppercase tracking-[0.8em]">Security Authenticated: Session Live</p>
         </div>
       </div>
     );
@@ -531,12 +544,15 @@ export default function App() {
                 className="flex-1 h-14 bg-[#66FFB2]/10 backdrop-blur-md border border-[#66FFB2]/30 rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-20 shadow-2xl"
               >
                 <Barcode className="w-5 h-5 text-[#66FFB2]" />
-                <span className="text-[10px] font-black text-white uppercase tracking-widest whitespace-nowrap">Add Label</span>
+                <div className="flex flex-col items-start leading-none">
+                  <span className="text-[10px] font-black text-white uppercase tracking-widest whitespace-nowrap">Add Label</span>
+                  <span className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">(FOR TRACKING)</span>
+                </div>
               </button>
             </div>
             
-            <p className="text-[8px] font-bold text-gray-600 uppercase tracking-widest text-center opacity-80">
-              Only capture items required for this specific order.
+            <p className="text-[10px] font-bold text-emerald-500/80 uppercase tracking-widest text-center opacity-90">
+              FOR REFERENCE ONLY. CONSOLIDATE YOUR ITEMS.
             </p>
           </div>
 
