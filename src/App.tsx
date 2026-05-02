@@ -268,14 +268,13 @@ export default function App() {
 
   const handleHandoff = () => {
     if (!session) return;
-    const { fName: firstName, lName: lastName } = splitName(session.name);
-    const { email, phoneNumber, servicesOrdered, customernotes, sessionid, reportid1, storecode, totalAmount } = session;
+    const { name, totalAmount, servicesOrdered, reportid1 } = session;
     
     const basePrice = parseFloat(totalAmount) || 0;
     const formattedPrice = basePrice.toFixed(2);
 
-    // Standardized form URL for better redirect stability
-    const jotformUrl = `https://form.jotform.com/261047358857164?name[first]=${encodeURIComponent(firstName)}&name[last]=${encodeURIComponent(lastName)}&email=${encodeURIComponent(email)}&phoneNumber=${encodeURIComponent(phoneNumber)}&myProducts[price]=${formattedPrice}&totalAmount=${formattedPrice}&servicesOrdered=${encodeURIComponent(servicesOrdered)}&customernotes=${encodeURIComponent(customernotes)}&sessionid=${sessionid}&reportId1=${reportid1}&storecode=${storecode}&date=${encodeURIComponent(new Date().toLocaleString())}`;
+    // PCI Compliant JotForm URL with simplified mapping
+    const jotformUrl = `https://pci.jotform.com/form/261217230124139?uniqueId1=${encodeURIComponent(reportid1)}&name=${encodeURIComponent(name)}&totalAmount=${formattedPrice}&servicesOrdered=${encodeURIComponent(servicesOrdered)}`;
 
     window.location.href = jotformUrl;
   };
@@ -463,7 +462,7 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen bg-black text-white font-sans flex flex-col overflow-hidden relative">
+    <div className="min-h-screen bg-black text-white font-sans flex flex-col overflow-x-hidden relative">
       <AnimatePresence>
         {flash && (
           <motion.div 
@@ -476,7 +475,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* Sleek Fixed Header */}
-      <header className="h-[60px] bg-black border-b border-[#1A1A1A] flex items-center px-4 shrink-0 relative z-50">
+      <header className="fixed top-0 inset-x-0 h-[60px] bg-black/80 backdrop-blur-md border-b border-[#1A1A1A] flex items-center px-4 shrink-0 z-50">
         <button 
           onClick={() => setMode('intake')}
           className="p-2 -ml-2 text-white hover:text-[#66FFB2] transition-colors active:scale-90"
@@ -489,9 +488,9 @@ export default function App() {
         <div className="w-10" /> {/* Spacer */}
       </header>
 
-      <main className="flex-1 flex flex-col overflow-hidden relative">
-        {/* Taller Viewfinder */}
-        <div className="relative h-[55vh] w-full bg-[#080808] border-b border-[#1A1A1A] overflow-hidden shrink-0 z-30">
+      <main className="flex-1 flex flex-col pt-[60px] pb-32">
+        {/* Taller Viewfinder - Professional Lens Style */}
+        <div className="relative h-[55vh] w-full bg-[#080808] border-b border-[#66FFB2]/30 shadow-[0_0_20px_rgba(102,255,178,0.1)] overflow-hidden shrink-0 z-30">
           <Webcam
             audio={false}
             muted
@@ -522,73 +521,71 @@ export default function App() {
               </p>
             </div>
           )}
-          
-          {/* Action Overlay / Control Shelf */}
-          <div className="absolute inset-x-0 bottom-0 bg-black/95 pt-8 pb-4 flex flex-col items-center gap-4 px-6 border-t border-white/5 shadow-[0_-20px_40px_rgba(0,0,0,0.8)]">
-            <div className="flex justify-center gap-4 w-full">
-              <button 
-                onClick={() => handleCapture('item')}
-                disabled={itemPhotos.length >= 4}
-                className="flex-1 h-14 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-20 shadow-2xl"
-              >
-                <Package className="w-5 h-5 text-[#66FFB2]" />
-                <div className="flex flex-col items-start leading-none">
-                  <span className="text-[10px] font-black text-white uppercase tracking-widest whitespace-nowrap">Add Item</span>
-                  <span className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">(Up to 4 as needed)</span>
-                </div>
-              </button>
-              
-              <button 
-                onClick={() => handleCapture('label')}
-                disabled={!!labelPhoto}
-                className="flex-1 h-14 bg-[#66FFB2]/10 backdrop-blur-md border border-[#66FFB2]/30 rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-20 shadow-2xl"
-              >
-                <Barcode className="w-5 h-5 text-[#66FFB2]" />
-                <div className="flex flex-col items-start leading-none">
-                  <span className="text-[10px] font-black text-white uppercase tracking-widest whitespace-nowrap">Add Label</span>
-                  <span className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">(FOR TRACKING)</span>
-                </div>
-              </button>
-            </div>
-            
-            <p className="text-[10px] font-bold text-emerald-500/80 uppercase tracking-widest text-center opacity-90">
-              FOR REFERENCE ONLY. CONSOLIDATE YOUR ITEMS.
-            </p>
-          </div>
 
           <div className="absolute top-4 left-4">
-             <div className="bg-black/60 backdrop-blur-md border border-white/5 px-3 py-1.5 rounded-full flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                <span className="text-[8px] font-black text-white uppercase tracking-[0.2em] whitespace-nowrap">Live Stream</span>
+             <div className="bg-black/80 backdrop-blur-md border border-white/10 px-4 py-2 rounded-full flex items-center gap-2 shadow-2xl">
+                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-[10px] font-black text-white uppercase tracking-[0.2em] whitespace-nowrap">Live Stream</span>
+             </div>
+          </div>
+
+          <div className="absolute top-4 right-4">
+             <div className="bg-black/80 backdrop-blur-md border border-white/10 px-4 py-2 rounded-full flex flex-col items-center shadow-2xl min-w-[60px]">
+                <span className="text-[14px] font-black text-[#66FFB2] uppercase leading-none font-mono">
+                  {itemPhotos.length} / 4
+                </span>
+                <span className="text-[8px] font-bold text-white/40 uppercase tracking-tighter mt-0.5">Items</span>
              </div>
           </div>
         </div>
 
-        {/* Data Pill & Grid */}
-        <div className="flex-1 flex flex-col px-6 pt-4 overflow-hidden">
-          {/* Elegant Data Pill - Tiered & Edge-Justified */}
-          <div className="flex flex-col gap-2 mb-4">
-            <div className="flex justify-between items-center w-full">
-              <div className="bg-[#0A0A0A] border-2 border-gray-500 shadow-[0_0_10px_rgba(102,255,178,0.2)] rounded-full px-4 py-1 flex items-center">
-                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">
-                  STORE <span className="text-white ml-1">{session?.storecode}</span>
-                </span>
+        {/* High-Impact Action Buttons - Vertical Stack - Tighter Padding */}
+        <div className="px-6 py-6 flex flex-col gap-3">
+          <button 
+            onClick={() => handleCapture('item')}
+            disabled={itemPhotos.length >= 4}
+            className="w-full h-24 bg-white/5 backdrop-blur-md border-2 border-white/10 rounded-2xl flex items-center justify-between px-8 active:scale-[0.98] transition-all disabled:opacity-20 shadow-2xl relative group overflow-hidden"
+          >
+            <div className="flex items-center gap-6">
+              <div className="p-3 bg-white/10 rounded-xl group-active:scale-90 transition-transform">
+                <Camera className="w-8 h-8 text-[#66FFB2]" />
               </div>
-              <div className="bg-[#0A0A0A] border-2 border-gray-500 shadow-[0_0_10px_rgba(102,255,178,0.2)] rounded-full px-4 py-1 flex items-center">
-                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">
-                  ID <span className="text-white ml-1">{session?.sessionid}</span>
-                </span>
+              <div className="flex flex-col items-start leading-tight">
+                <span className="text-[18px] font-bold text-white uppercase tracking-wider">Snap Item Photo</span>
+                <span className="text-[11px] font-bold text-[#66FFB2] uppercase tracking-[0.2em] mt-1">For Reference</span>
               </div>
             </div>
-            <div className="self-center bg-[#0A0A0A] border-2 border-gray-500 rounded-full px-6 py-1 flex items-center">
-              <span className="text-[9px] font-black text-[#66FFB2] uppercase tracking-widest whitespace-nowrap">
-                {session?.name || 'GUEST USER'}
-              </span>
+            <div className="absolute right-0 top-0 bottom-0 w-1 bg-[#66FFB2] opacity-0 group-hover:opacity-100 transition-opacity" />
+          </button>
+          
+          <button 
+            onClick={() => handleCapture('label')}
+            disabled={!!labelPhoto}
+            className="w-full h-24 bg-[#66FFB2]/5 backdrop-blur-md border-2 border-[#66FFB2]/30 rounded-2xl flex items-center justify-between px-8 active:scale-[0.98] transition-all disabled:opacity-20 shadow-2xl relative group overflow-hidden"
+          >
+            <div className="flex items-center gap-6">
+              <div className="p-3 bg-[#66FFB2]/10 rounded-xl group-active:scale-90 transition-transform">
+                <Barcode className="w-8 h-8 text-[#66FFB2]" />
+              </div>
+              <div className="flex flex-col items-start leading-tight">
+                <span className="text-[18px] font-bold text-white uppercase tracking-wider">Snap Shipping Label</span>
+                <span className="text-[11px] font-bold text-[#66FFB2] uppercase tracking-[0.2em] mt-1">For Tracking</span>
+              </div>
             </div>
-          </div>
+            <div className={`p-1.5 rounded-full ${labelPhoto ? 'bg-[#66FFB2]' : 'bg-white/10'}`}>
+              <CheckCircle2 className={`w-5 h-5 ${labelPhoto ? 'text-black' : 'text-white/20'}`} />
+            </div>
+            <div className="absolute right-0 top-0 bottom-0 w-1 bg-[#66FFB2] opacity-0 group-hover:opacity-100 transition-opacity" />
+          </button>
 
-          {/* Grid Preview */}
-          <div className="grid grid-cols-5 gap-2 mb-8 overflow-y-auto">
+          <p className="text-[10px] font-bold text-emerald-500/80 uppercase tracking-widest text-center mt-1">
+            FOR REFERENCE ONLY. CONSOLIDATE YOUR ITEMS.
+          </p>
+        </div>
+
+        {/* Captured Gallery - Compact Horizontal Row */}
+        <div className="px-6 pb-6 overflow-x-auto">
+          <div className="flex gap-4 pb-4">
             <AnimatePresence mode="popLayout">
               {[0, 1, 2, 3].map((idx) => {
                 const photo = itemPhotos[idx];
@@ -596,30 +593,30 @@ export default function App() {
                   <motion.div
                     key={`item-${idx}`}
                     layout
-                    className={`relative aspect-square rounded-2xl overflow-hidden border-2 ${photo ? 'border-[#66FFB2]/50' : 'border-gray-500 border-dashed'} bg-[#050505] flex items-center justify-center`}
+                    className={`relative w-28 h-28 flex-shrink-0 rounded-[12px] overflow-hidden border-2 transition-all duration-500 ${photo ? 'border-[#66FFB2]/50 shadow-[0_0_15px_rgba(102,255,178,0.2)]' : 'border-gray-800 border-dashed'} bg-[#050505] flex items-center justify-center`}
                   >
                     {photo ? (
                       <>
                         <img src={photo.url} alt="Item" className="w-full h-full object-cover" />
-                        <button onClick={() => removePhoto(photo.id)} className="absolute top-1 right-1 p-1 bg-black/80 rounded-full z-10 border border-white/10">
-                          <Trash2 className="w-2.5 h-2.5 text-red-500" />
+                        <button onClick={() => removePhoto(photo.id)} className="absolute top-2 right-2 p-1.5 bg-black/80 backdrop-blur-md rounded-full z-10 border border-white/10 shadow-xl active:scale-90 transition-transform">
+                          <Trash2 className="w-3.5 h-3.5 text-red-500" />
                         </button>
                         {photo.status === 'ready' && (
-                          <div className="absolute top-1 left-1 p-0.5 bg-[#66FFB2] rounded-full z-10 shadow-lg">
-                            <CheckCircle2 className="w-2.5 h-2.5 text-black" />
+                          <div className="absolute top-2 left-2 p-1 bg-[#66FFB2] rounded-full z-10 shadow-[0_0_10px_#66FFB2]">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-black" />
                           </div>
                         )}
                         {photo.status === 'syncing' && (
-                          <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
-                            <Loader2 className="w-4 h-4 text-[#66FFB2] animate-spin" />
+                          <div className="absolute inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center">
+                            <Loader2 className="w-6 h-6 text-[#66FFB2] animate-spin" />
                           </div>
                         )}
                         {photo.status === 'error' && (
-                          <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-2">
-                             <p className="text-[6px] font-black text-red-500 uppercase tracking-widest">Timeout</p>
+                          <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-1">
+                             <p className="text-[8px] font-black text-red-500 uppercase tracking-widest leading-none">Fail</p>
                              <button 
                                onClick={() => retryPhoto(photo)}
-                               className="bg-[#66FFB2] text-black px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest active:scale-90 transition-transform"
+                               className="bg-white text-black px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-widest active:scale-95 transition-transform"
                              >
                                Retry
                              </button>
@@ -627,7 +624,10 @@ export default function App() {
                         )}
                       </>
                     ) : (
-                      <Package className="w-4 h-4 text-[#66FFB2]" />
+                      <div className="flex flex-col items-center gap-1 opacity-20">
+                        <Package className="w-6 h-6 text-gray-500" />
+                        <span className="text-[8px] font-black uppercase tracking-widest text-gray-500">Item {idx + 1}</span>
+                      </div>
                     )}
                   </motion.div>
                 );
@@ -635,30 +635,30 @@ export default function App() {
 
               <motion.div
                 layout
-                className={`relative aspect-square rounded-2xl overflow-hidden border-2 ${labelPhoto ? 'border-[#66FFB2]' : 'border-gray-500 border-dotted'} bg-[#050505] flex items-center justify-center`}
+                className={`relative w-28 h-28 flex-shrink-0 rounded-[12px] overflow-hidden border-2 transition-all duration-500 ${labelPhoto ? 'border-[#66FFB2] shadow-[0_0_15px_rgba(102,255,178,0.3)]' : 'border-gray-800 border-dotted'} bg-[#050505] flex items-center justify-center`}
               >
                 {labelPhoto ? (
                   <>
                     <img src={labelPhoto.url} alt="Label" className="w-full h-full object-cover" />
-                    <button onClick={() => removePhoto(labelPhoto.id)} className="absolute top-1 right-1 p-1 bg-black/80 rounded-full z-10 border border-white/10">
-                      <Trash2 className="w-2.5 h-2.5 text-red-500" />
+                    <button onClick={() => removePhoto(labelPhoto.id)} className="absolute top-2 right-2 p-1.5 bg-black/80 backdrop-blur-md rounded-full z-10 border border-white/10 shadow-xl active:scale-90 transition-transform">
+                      <Trash2 className="w-3.5 h-3.5 text-red-500" />
                     </button>
                     {labelPhoto.status === 'ready' && (
-                      <div className="absolute top-1 left-1 p-0.5 bg-[#66FFB2] rounded-full z-10 shadow-lg">
-                        <CheckCircle2 className="w-2.5 h-2.5 text-black" />
+                      <div className="absolute top-2 left-2 p-1 bg-[#66FFB2] rounded-full z-10 shadow-[0_0_10px_#66FFB2]">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-black" />
                       </div>
                     )}
                     {labelPhoto.status === 'syncing' && (
-                      <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
-                        <Loader2 className="w-4 h-4 text-[#66FFB2] animate-spin" />
+                      <div className="absolute inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center">
+                        <Loader2 className="w-6 h-6 text-[#66FFB2] animate-spin" />
                       </div>
                     )}
                     {labelPhoto.status === 'error' && (
-                      <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-2">
-                         <p className="text-[6px] font-black text-red-500 uppercase tracking-widest">Timeout</p>
+                      <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-1">
+                         <p className="text-[8px] font-black text-red-500 uppercase tracking-widest leading-none">Fail</p>
                          <button 
                            onClick={() => retryPhoto(labelPhoto)}
-                           className="bg-[#66FFB2] text-black px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest active:scale-90 transition-transform"
+                           className="bg-white text-black px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-widest active:scale-95 transition-transform"
                          >
                            Retry
                          </button>
@@ -666,38 +666,65 @@ export default function App() {
                     )}
                   </>
                 ) : (
-                  <Barcode className="w-5 h-5 text-[#66FFB2]" />
+                  <div className="flex flex-col items-center gap-1 opacity-20">
+                    <Barcode className="w-6 h-6 text-gray-500" />
+                    <span className="text-[8px] font-black uppercase tracking-widest text-gray-500">Label</span>
+                  </div>
                 )}
               </motion.div>
             </AnimatePresence>
           </div>
         </div>
+
+        {/* Data Context */}
+        <div className="px-6 pb-6">
+          <div className="bg-[#0A0A0A] border-2 border-white/5 p-5 rounded-[24px] shadow-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex flex-col">
+                <span className="text-[14px] font-black text-gray-500 uppercase tracking-widest mb-1">Store Code</span>
+                <span className="text-[16px] font-black text-white uppercase tracking-widest font-mono">{session?.storecode}</span>
+              </div>
+              <div className="h-10 w-[2px] bg-white/5" />
+              <div className="flex flex-col items-end">
+                <span className="text-[14px] font-black text-gray-500 uppercase tracking-widest mb-1">Session ID</span>
+                <span className="text-[16px] font-black text-white uppercase tracking-widest font-mono">{session?.sessionid}</span>
+              </div>
+            </div>
+            <div className="pt-4 border-t border-white/5 flex items-center justify-between">
+              <span className="text-[16px] font-bold text-[#66FFB2] tracking-wider truncate uppercase">
+                {session?.name || 'GUEST USER'}
+              </span>
+              <Edit3 className="w-5 h-5 text-gray-500 opacity-50" />
+            </div>
+          </div>
+        </div>
       </main>
 
-      {/* Sticky Bottom Bar */}
-      <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black via-black/90 to-transparent z-50">
+      {/* Sticky Bottom Bar - iOS Blur Style */}
+      <div className="fixed bottom-0 left-0 right-0 p-6 bg-black/30 backdrop-blur-xl border-t border-white/5 z-50">
         <button
           onClick={handleHandoff}
           disabled={!allPhotosReady}
           className={`
-            w-full py-5 rounded-2xl text-[13px] font-black uppercase tracking-[0.3em] transition-all relative overflow-hidden
+            w-full py-6 rounded-2xl text-[14px] font-extrabold uppercase tracking-[0.25em] transition-all relative overflow-hidden shadow-[0_20px_40px_rgba(0,0,0,0.4)]
             ${allPhotosReady 
-              ? 'bg-white text-black shadow-[0_0_40px_rgba(255,255,255,0.2)] active:scale-[0.98]' 
-              : 'bg-[#0A0A0A] text-[#222] border border-[#1A1A1A] cursor-not-allowed text-white'}
+              ? 'bg-[#66FFB2] text-black active:scale-[0.97]' 
+              : 'bg-[#111] text-gray-600 border border-white/5 cursor-not-allowed'}
           `}
         >
           <span className="relative z-10 whitespace-nowrap">
-            {isSyncing ? 'Syncing...' : 'Complete & Proceed'}
+            {isSyncing ? 'Processing Assets...' : 'Complete & Proceed'}
           </span>
           {isSyncing && (
             <motion.div 
-              className="absolute inset-0 bg-white/10"
+              className="absolute inset-0 bg-white/20"
               animate={{ x: ['-100%', '100%'] }}
-              transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+              transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
             />
           )}
         </button>
       </div>
+
 
       {error && (
         <motion.div 
