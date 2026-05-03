@@ -191,13 +191,13 @@ export default function App() {
       const blob = await res.blob();
       const file = new File([blob], `${type}-${photoId}.jpg`, { type: 'image/jpeg' });
 
-      const options = {
-        maxSizeMB: 0.2, // Slightly larger for better detail
-        maxWidthOrHeight: 1600, // Higher res for inspection
-        useWebWorker: true,
-        fileType: 'image/jpeg' as string,
-        initialQuality: 0.7,
-      };
+    const options = {
+      maxSizeMB: 0.15, // Faster compression
+      maxWidthOrHeight: 1200, // Optimized for speed
+      useWebWorker: true,
+      fileType: 'image/jpeg' as string,
+      initialQuality: 0.6, // Faster initial pass
+    };
       
       const compressedFile = await imageCompression(file, options);
       
@@ -268,13 +268,29 @@ export default function App() {
 
   const handleHandoff = () => {
     if (!session) return;
-    const { name, totalAmount, servicesOrdered, reportid1 } = session;
     
+    // Exact mapping from Customer Intake and Session data
+    const firstName = intakeData.firstName.trim();
+    const lastName = intakeData.lastName.trim();
+    const email = intakeData.email.trim();
+    const phone = intakeData.phone.trim();
+    
+    const { totalAmount, servicesOrdered, reportid1 } = session;
+    
+    // Ensure amount is string with two decimal places
     const basePrice = parseFloat(totalAmount) || 0;
     const formattedPrice = basePrice.toFixed(2);
 
-    // PCI Compliant JotForm URL with simplified mapping
-    const jotformUrl = `https://pci.jotform.com/form/261217230124139?uniqueId1=${encodeURIComponent(reportid1)}&name=${encodeURIComponent(name)}&totalAmount=${formattedPrice}&servicesOrdered=${encodeURIComponent(servicesOrdered)}`;
+    // PCI Compliant JotForm URL with precise parameter mapping
+    // We use a manual string construction to ensure brackets are handled exactly as JotForm expects
+    const jotformUrl = `https://pci.jotform.com/form/261217230124139?` + 
+      `name[first]=${encodeURIComponent(firstName)}` +
+      `&name[last]=${encodeURIComponent(lastName)}` +
+      `&email=${encodeURIComponent(email)}` +
+      `&phoneNumber=${encodeURIComponent(phone)}` +
+      `&totalAmount=${formattedPrice}` +
+      `&uniqueId=${encodeURIComponent(reportid1 || '')}` +
+      `&servicesOrdered=${encodeURIComponent(servicesOrdered || '')}`;
 
     window.location.href = jotformUrl;
   };
@@ -297,7 +313,7 @@ export default function App() {
   if (mode === 'success') {
     const params = new URLSearchParams(window.location.search);
     // Precise Mapping per Final Specification: reportid1, name, totalAmount
-    const displayId = (params.get('reportid1') || params.get('reportId1') || session?.reportid1 || '000000').replace('M2M-', '');
+    const displayId = (params.get('reportid1') || params.get('reportId1') || params.get('uniqueId') || session?.reportid1 || '000000').replace('M2M-', '');
     const displayName = params.get('name') || session?.name || 'Customer Verified';
     const displayTotal = params.get('totalAmount') || session?.totalAmount || '0.00';
     
@@ -523,64 +539,65 @@ export default function App() {
           )}
 
           <div className="absolute top-4 left-4">
-             <div className="bg-black/80 backdrop-blur-md border border-white/10 px-4 py-2 rounded-full flex items-center gap-2 shadow-2xl">
-                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                <span className="text-[10px] font-black text-white uppercase tracking-[0.2em] whitespace-nowrap">Live Stream</span>
+             <div className="bg-black/90 backdrop-blur-md border border-white/20 px-5 py-2.5 rounded-full flex items-center gap-3 shadow-2xl">
+                <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
+                <span className="text-[12px] font-black text-white uppercase tracking-[0.25em] whitespace-nowrap">Live Stream</span>
              </div>
           </div>
 
           <div className="absolute top-4 right-4">
-             <div className="bg-black/80 backdrop-blur-md border border-white/10 px-4 py-2 rounded-full flex flex-col items-center shadow-2xl min-w-[60px]">
-                <span className="text-[14px] font-black text-[#66FFB2] uppercase leading-none font-mono">
+             <div className="bg-black/90 backdrop-blur-md border border-white/20 px-5 py-2.5 rounded-[20px] flex flex-col items-center shadow-2xl min-w-[70px]">
+                <span className="text-[20px] font-black text-[#66FFB2] uppercase leading-none font-mono tracking-tighter">
                   {itemPhotos.length} / 4
                 </span>
-                <span className="text-[8px] font-bold text-white/40 uppercase tracking-tighter mt-0.5">Items</span>
+                <span className="text-[9px] font-bold text-white/50 uppercase tracking-[0.1em] mt-1">Items</span>
              </div>
           </div>
         </div>
 
-        {/* High-Impact Action Buttons - Vertical Stack - Tighter Padding */}
-        <div className="px-6 py-6 flex flex-col gap-3">
+        <div className="px-6 pt-5">
+          <p className="text-[10px] font-bold text-emerald-500/80 uppercase tracking-widest text-center">
+            CONSOLIDATE ITEMS TO AVOID LAG
+          </p>
+        </div>
+
+        {/* Optimized Action Panel - Side-by-Side for Discoverability */}
+        <div className="px-6 py-5 grid grid-cols-2 gap-4">
           <button 
             onClick={() => handleCapture('item')}
             disabled={itemPhotos.length >= 4}
-            className="w-full h-24 bg-white/5 backdrop-blur-md border-2 border-white/10 rounded-2xl flex items-center justify-between px-8 active:scale-[0.98] transition-all disabled:opacity-20 shadow-2xl relative group overflow-hidden"
+            className="h-32 bg-white/5 backdrop-blur-md border-2 border-white/10 rounded-2xl flex flex-col items-center justify-center gap-3 active:scale-[0.96] transition-all disabled:opacity-20 shadow-2xl relative group overflow-hidden"
           >
-            <div className="flex items-center gap-6">
-              <div className="p-3 bg-white/10 rounded-xl group-active:scale-90 transition-transform">
-                <Camera className="w-8 h-8 text-[#66FFB2]" />
-              </div>
-              <div className="flex flex-col items-start leading-tight">
-                <span className="text-[18px] font-bold text-white uppercase tracking-wider">Snap Item Photo</span>
-                <span className="text-[11px] font-bold text-[#66FFB2] uppercase tracking-[0.2em] mt-1">For Reference</span>
-              </div>
+            <div className="p-3 bg-white/10 rounded-xl group-active:scale-90 transition-transform">
+              <Camera className="w-8 h-8 text-[#66FFB2]" />
             </div>
-            <div className="absolute right-0 top-0 bottom-0 w-1 bg-[#66FFB2] opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="flex flex-col items-center leading-tight text-center">
+              <span className="text-[15px] font-bold text-white uppercase tracking-wider">Snap Item</span>
+              <span className="text-[10px] font-black text-[#66FFB2] uppercase tracking-[0.2em] mt-1">{itemPhotos.length}/4</span>
+            </div>
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#66FFB2] opacity-20" />
           </button>
           
           <button 
             onClick={() => handleCapture('label')}
             disabled={!!labelPhoto}
-            className="w-full h-24 bg-[#66FFB2]/5 backdrop-blur-md border-2 border-[#66FFB2]/30 rounded-2xl flex items-center justify-between px-8 active:scale-[0.98] transition-all disabled:opacity-20 shadow-2xl relative group overflow-hidden"
+            className="h-32 bg-[#66FFB2]/5 backdrop-blur-md border-2 border-[#66FFB2]/30 rounded-2xl flex flex-col items-center justify-center gap-3 active:scale-[0.96] transition-all disabled:opacity-20 shadow-2xl relative group overflow-hidden"
           >
-            <div className="flex items-center gap-6">
-              <div className="p-3 bg-[#66FFB2]/10 rounded-xl group-active:scale-90 transition-transform">
-                <Barcode className="w-8 h-8 text-[#66FFB2]" />
-              </div>
-              <div className="flex flex-col items-start leading-tight">
-                <span className="text-[18px] font-bold text-white uppercase tracking-wider">Snap Shipping Label</span>
-                <span className="text-[11px] font-bold text-[#66FFB2] uppercase tracking-[0.2em] mt-1">For Tracking</span>
-              </div>
+            <div className="p-3 bg-[#66FFB2]/10 rounded-xl group-active:scale-90 transition-transform">
+              <Barcode className="w-8 h-8 text-[#66FFB2]" />
             </div>
-            <div className={`p-1.5 rounded-full ${labelPhoto ? 'bg-[#66FFB2]' : 'bg-white/10'}`}>
-              <CheckCircle2 className={`w-5 h-5 ${labelPhoto ? 'text-black' : 'text-white/20'}`} />
+            <div className="flex flex-col items-center leading-tight text-center">
+              <span className="text-[15px] font-bold text-white uppercase tracking-wider">Snap Label #'s</span>
+              <span className="text-[10px] font-black text-[#66FFB2] uppercase tracking-[0.2em] mt-1">{labelPhoto ? 'READY' : 'REQUIRED'}</span>
             </div>
-            <div className="absolute right-0 top-0 bottom-0 w-1 bg-[#66FFB2] opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className={`p-1.5 absolute top-3 right-3 rounded-full ${labelPhoto ? 'bg-[#66FFB2]' : 'bg-white/10'}`}>
+              <CheckCircle2 className={`w-4 h-4 ${labelPhoto ? 'text-black' : 'text-white/20'}`} />
+            </div>
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#66FFB2] opacity-40" />
           </button>
+        </div>
 
-          <p className="text-[10px] font-bold text-emerald-500/80 uppercase tracking-widest text-center mt-1">
-            FOR REFERENCE ONLY. CONSOLIDATE YOUR ITEMS.
-          </p>
+        <div className="px-6 pb-2">
         </div>
 
         {/* Captured Gallery - Compact Horizontal Row */}
