@@ -125,7 +125,7 @@ export default function App() {
       name,
       email,
       phoneNumber,
-      totalAmount: params.get('totalAmount') || '',
+      totalAmount: '1.00', // Temporary test amount (originally params.get('totalAmount') || '')
       reportid1: params.get('reportid1') || '',
       storecode: (params.get('storecode') || 'DEFAULT').toLowerCase().trim(),
       date: params.get('date') || new Date().toISOString().split('T')[0],
@@ -275,24 +275,28 @@ export default function App() {
     const email = intakeData.email.trim();
     const phone = intakeData.phone.trim();
     
-    const { totalAmount, servicesOrdered, reportid1 } = session;
+    const { totalAmount, servicesOrdered, reportid1, sessionid, storecode } = session;
     
     // Ensure amount is string with two decimal places
     const basePrice = parseFloat(totalAmount) || 0;
     const formattedPrice = basePrice.toFixed(2);
 
     // PCI Compliant JotForm URL with precise parameter mapping
-    // We use a manual string construction to ensure brackets are handled exactly as JotForm expects
-    const jotformUrl = `https://pci.jotform.com/form/261217230124139?` + 
-      `name[first]=${encodeURIComponent(firstName)}` +
-      `&name[last]=${encodeURIComponent(lastName)}` +
-      `&email=${encodeURIComponent(email)}` +
-      `&phoneNumber=${encodeURIComponent(phone)}` +
-      `&totalAmount=${formattedPrice}` +
-      `&uniqueId=${encodeURIComponent(reportid1 || '')}` +
-      `&servicesOrdered=${encodeURIComponent(servicesOrdered || '')}`;
+    // Targets: name[first], name[last], email, phoneNumber[full], totalAmount, reportId1, sessionid, storecode, servicesOrdered
+    const baseUrl = `https://pci.jotform.com/261217230124139`;
+    
+    const params = new URLSearchParams();
+    params.append('name[first]', firstName);
+    params.append('name[last]', lastName);
+    params.append('email', email);
+    params.append('phoneNumber[full]', phone);
+    params.append('totalAmount', formattedPrice);
+    params.append('reportId1', reportid1 || '');
+    params.append('sessionid', sessionid || '');
+    params.append('storecode', storecode || '');
+    params.append('servicesOrdered', servicesOrdered || '');
 
-    window.location.href = jotformUrl;
+    window.location.href = `${baseUrl}?${params.toString()}`;
   };
 
   const isSyncing = photos.some(p => p.status === 'syncing');
