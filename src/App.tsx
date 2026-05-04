@@ -266,43 +266,60 @@ export default function App() {
                         isEmailValid(intakeData.email) && 
                         isPhoneValid(intakeData.phone);
 
-  const handleHandoff = () => {
-    if (!session) return;
+  const handleHandoff = async () => {
+    if (!session || isSyncing || isUploading) return;
     
-    // Exact mapping from Customer Intake and Session data
-    const firstName = intakeData.firstName.trim();
-    const lastName = intakeData.lastName.trim();
-    const email = intakeData.email.trim();
-    const phone = intakeData.phone.trim();
-    
-    const { totalAmount, servicesOrdered, reportid1, sessionid, storecode } = session;
-    
-    // Ensure amount is string with two decimal places
-    const basePrice = parseFloat(totalAmount) || 0;
-    const formattedPrice = basePrice.toFixed(2);
+    setIsUploading(true);
+    try {
+      // Exact mapping from Customer Intake and Session data
+      const firstName = intakeData.firstName.trim();
+      const lastName = intakeData.lastName.trim();
+      const email = intakeData.email.trim();
+      const phone = intakeData.phone.trim();
+      
+      const { totalAmount, servicesOrdered, reportid1, sessionid, storecode } = session;
+      
+      // --- Services Formatting Logic ---
+      const rawServices = (servicesOrdered || '').replace(/\+/g, ' ');
+      const serviceItems = rawServices.split('|').map(s => s.trim()).filter(Boolean);
+      
+      const formattedServices = serviceItems.map(item => {
+        if (item.toLowerCase().includes('shipping') || item.toLowerCase().includes('insurance')) {
+          return item;
+        }
+        return `- ${item}`;
+      }).join('\n');
+      
+      const basePrice = parseFloat(totalAmount) || 0;
+      const formattedPrice = basePrice.toFixed(2);
 
-    // PCI Compliant JotForm URL with precise parameter mapping
-    // Targets: name[first], name[last], email, phoneNumber[full], totalAmount, reportId1, sessionid, storecode, servicesOrdered
-    const baseUrl = `https://pci.jotform.com/261217230124139`;
-    
-    const params = new URLSearchParams();
-    params.append('name[first]', firstName);
-    params.append('name[last]', lastName);
-    params.append('email', email);
-    params.append('phoneNumber[full]', phone);
-    params.append('totalAmount', formattedPrice);
-    params.append('reportId1', reportid1 || '');
-    params.append('sessionid', sessionid || '');
-    params.append('storecode', storecode || '');
-    params.append('servicesOrdered', servicesOrdered || '');
+      const baseUrl = `https://pci.jotform.com/261217230124139`;
+      
+      const params = new URLSearchParams();
+      params.append('name[first]', firstName);
+      params.append('name[last]', lastName);
+      params.append('email', email);
+      params.append('phoneNumber[full]', phone);
+      params.append('totalAmount', formattedPrice);
+      params.append('reportId1', reportid1 || '');
+      params.append('sessionid', sessionid || '');
+      params.append('storecode', storecode || '');
+      params.append('servicesOrdered', formattedServices);
 
-    window.location.href = `${baseUrl}?${params.toString()}`;
+      window.location.href = `${baseUrl}?${params.toString()}`;
+    } catch (err) {
+      console.error('Handoff error:', err);
+      setError('Redirect failed. Please check your connection.');
+    } finally {
+      // Use a brief delay to allow redirect to initiate before unlocking button
+      setTimeout(() => setIsUploading(false), 2000);
+    }
   };
 
   const isSyncing = photos.some(p => p.status === 'syncing');
   const hasItem = photos.some(p => p.type === 'item' && p.status === 'ready');
   const hasLabel = photos.some(p => p.type === 'label' && p.status === 'ready');
-  const allPhotosReady = (hasItem || hasLabel) && !isSyncing;
+  const allPhotosReady = (hasItem || hasLabel) && !isSyncing && !isUploading;
 
   const itemPhotos = photos.filter(p => p.type === 'item');
   const labelPhoto = photos.find(p => p.type === 'label');
@@ -482,7 +499,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white font-sans flex flex-col overflow-x-hidden relative">
+    <div className="h-screen w-full bg-[#000000] text-white font-sans flex flex-col overflow-hidden relative">
       <AnimatePresence>
         {flash && (
           <motion.div 
@@ -494,23 +511,9 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Sleek Fixed Header */}
-      <header className="fixed top-0 inset-x-0 h-[60px] bg-black/80 backdrop-blur-md border-b border-[#1A1A1A] flex items-center px-4 shrink-0 z-50">
-        <button 
-          onClick={() => setMode('intake')}
-          className="p-2 -ml-2 text-white hover:text-[#66FFB2] transition-colors active:scale-90"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <div className="flex-1 text-center">
-          <h1 className="text-[14px] font-black tracking-[0.3em] text-[#66FFB2] uppercase whitespace-nowrap">M2M PHOTO BRIDGE</h1>
-        </div>
-        <div className="w-10" /> {/* Spacer */}
-      </header>
-
-      <main className="flex-1 flex flex-col pt-[60px] pb-32">
-        {/* Taller Viewfinder - Professional Lens Style */}
-        <div className="relative h-[55vh] w-full bg-[#080808] border-b border-[#66FFB2]/30 shadow-[0_0_20px_rgba(102,255,178,0.1)] overflow-hidden shrink-0 z-30">
+      <main className="flex-1 relative flex flex-col overflow-hidden">
+        {/* Immersive Viewfinder */}
+        <div className="relative h-[85vh] w-full bg-[#000000] overflow-hidden shrink-0 z-10">
           <Webcam
             audio={false}
             muted
@@ -530,230 +533,186 @@ export default function App() {
             className="w-full h-full object-cover"
           />
           
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/40 pointer-events-none" />
+
           {cameraError && (
             <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center p-6 text-center z-50">
               <Camera className="w-12 h-12 text-red-500 mb-4 opacity-50" />
               <p className="text-red-500 font-black uppercase tracking-widest text-[10px] mb-2">Camera Access Failed</p>
               <p className="text-gray-400 text-[8px] uppercase tracking-wider max-w-[200px] leading-relaxed">
-                {cameraError.includes('NotAllowedError') 
-                  ? 'Please enable camera permissions in your browser settings and refresh.' 
-                  : 'Your device may not support the requested camera mode. Try refreshing the app.'}
+                Enable camera permissions in settings.
               </p>
             </div>
           )}
 
-          <div className="absolute top-4 left-4">
-             <div className="bg-black/90 backdrop-blur-md border border-white/20 px-5 py-2.5 rounded-full flex items-center gap-3 shadow-2xl">
-                <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
-                <span className="text-[12px] font-black text-white uppercase tracking-[0.25em] whitespace-nowrap">Live Stream</span>
-             </div>
+          {/* Floating Header Overlays */}
+          <div className="absolute top-6 left-6 flex flex-col gap-1">
+             <button 
+               onClick={() => setMode('intake')}
+               className="p-3 bg-black/40 backdrop-blur-xl border border-white/10 rounded-full text-white active:scale-90 transition-all shadow-2xl"
+             >
+               <ArrowLeft className="w-5 h-5" />
+             </button>
           </div>
 
-          <div className="absolute top-4 right-4">
-             <div className="bg-black/90 backdrop-blur-md border border-white/20 px-5 py-2.5 rounded-[20px] flex flex-col items-center shadow-2xl min-w-[70px]">
-                <span className="text-[20px] font-black text-[#66FFB2] uppercase leading-none font-mono tracking-tighter">
+          <div className="absolute top-6 right-6">
+             <div className="bg-black/60 backdrop-blur-xl border border-white/20 px-5 py-2.5 rounded-full flex items-center gap-3 shadow-2xl">
+                <span className="text-[14px] font-black text-[#00c86e] uppercase font-mono tracking-tighter">
                   {itemPhotos.length} / 4
                 </span>
-                <span className="text-[9px] font-bold text-white/50 uppercase tracking-[0.1em] mt-1">Items</span>
+                <span className="text-[9px] font-bold text-white/70 uppercase tracking-[0.1em]">Photos</span>
              </div>
           </div>
-        </div>
 
-        <div className="px-6 pt-5">
-          <p className="text-[10px] font-bold text-emerald-500/80 uppercase tracking-widest text-center">
-            CONSOLIDATE ITEMS TO AVOID LAG
-          </p>
-        </div>
-
-        {/* Optimized Action Panel - Side-by-Side for Discoverability */}
-        <div className="px-6 py-5 grid grid-cols-2 gap-4">
-          <button 
-            onClick={() => handleCapture('item')}
-            disabled={itemPhotos.length >= 4}
-            className="h-32 bg-white/5 backdrop-blur-md border-2 border-white/10 rounded-2xl flex flex-col items-center justify-center gap-3 active:scale-[0.96] transition-all disabled:opacity-20 shadow-2xl relative group overflow-hidden"
-          >
-            <div className="p-3 bg-white/10 rounded-xl group-active:scale-90 transition-transform">
-              <Camera className="w-8 h-8 text-[#66FFB2]" />
-            </div>
-            <div className="flex flex-col items-center leading-tight text-center">
-              <span className="text-[15px] font-bold text-white uppercase tracking-wider">Snap Item</span>
-              <span className="text-[10px] font-black text-[#66FFB2] uppercase tracking-[0.2em] mt-1">{itemPhotos.length}/4</span>
-            </div>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#66FFB2] opacity-20" />
-          </button>
-          
-          <button 
-            onClick={() => handleCapture('label')}
-            disabled={!!labelPhoto}
-            className="h-32 bg-[#66FFB2]/5 backdrop-blur-md border-2 border-[#66FFB2]/30 rounded-2xl flex flex-col items-center justify-center gap-3 active:scale-[0.96] transition-all disabled:opacity-20 shadow-2xl relative group overflow-hidden"
-          >
-            <div className="p-3 bg-[#66FFB2]/10 rounded-xl group-active:scale-90 transition-transform">
-              <Barcode className="w-8 h-8 text-[#66FFB2]" />
-            </div>
-            <div className="flex flex-col items-center leading-tight text-center">
-              <span className="text-[15px] font-bold text-white uppercase tracking-wider">Snap Label #'s</span>
-              <span className="text-[10px] font-black text-[#66FFB2] uppercase tracking-[0.2em] mt-1">{labelPhoto ? 'READY' : 'REQUIRED'}</span>
-            </div>
-            <div className={`p-1.5 absolute top-3 right-3 rounded-full ${labelPhoto ? 'bg-[#66FFB2]' : 'bg-white/10'}`}>
-              <CheckCircle2 className={`w-4 h-4 ${labelPhoto ? 'text-black' : 'text-white/20'}`} />
-            </div>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#66FFB2] opacity-40" />
-          </button>
-        </div>
-
-        <div className="px-6 pb-2">
-        </div>
-
-        {/* Captured Gallery - Compact Horizontal Row */}
-        <div className="px-6 pb-6 overflow-x-auto">
-          <div className="flex gap-4 pb-4">
-            <AnimatePresence mode="popLayout">
-              {[0, 1, 2, 3].map((idx) => {
-                const photo = itemPhotos[idx];
-                return (
-                  <motion.div
-                    key={`item-${idx}`}
-                    layout
-                    className={`relative w-28 h-28 flex-shrink-0 rounded-[12px] overflow-hidden border-2 transition-all duration-500 ${photo ? 'border-[#66FFB2]/50 shadow-[0_0_15px_rgba(102,255,178,0.2)]' : 'border-gray-800 border-dashed'} bg-[#050505] flex items-center justify-center`}
-                  >
-                    {photo ? (
-                      <>
-                        <img src={photo.url} alt="Item" className="w-full h-full object-cover" />
-                        <button onClick={() => removePhoto(photo.id)} className="absolute top-2 right-2 p-1.5 bg-black/80 backdrop-blur-md rounded-full z-10 border border-white/10 shadow-xl active:scale-90 transition-transform">
-                          <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                        </button>
-                        {photo.status === 'ready' && (
-                          <div className="absolute top-2 left-2 p-1 bg-[#66FFB2] rounded-full z-10 shadow-[0_0_10px_#66FFB2]">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-black" />
+          {/* Compact Gallery Strip Overlay */}
+          <div className="absolute bottom-32 left-0 right-0 px-6 overflow-x-auto pointer-events-auto">
+            <div className="flex gap-2 justify-center pb-2">
+              <AnimatePresence mode="popLayout">
+                {[0, 1, 2, 3].map((idx) => {
+                  const photo = itemPhotos[idx];
+                  return (
+                    <motion.button
+                      key={`item-overlay-${idx}`}
+                      layout
+                      onClick={() => !photo && handleCapture('item')}
+                      disabled={!!photo}
+                      className={`relative w-12 h-12 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all duration-300 ${photo ? 'border-[#00c86e]/80 shadow-[0_0_10px_rgba(0,200,110,0.3)]' : 'border-white/10 bg-black/40'} flex items-center justify-center active:scale-95`}
+                    >
+                      {photo ? (
+                        <>
+                          <img src={photo.url} alt="Item" className="w-full h-full object-cover" />
+                          <div 
+                            onClick={(e) => { e.stopPropagation(); removePhoto(photo.id); }} 
+                            className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 active:opacity-100 transition-opacity"
+                          >
+                            <Trash2 className="w-4 h-4 text-red-500" />
                           </div>
-                        )}
-                        {photo.status === 'syncing' && (
-                          <div className="absolute inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center">
-                            <Loader2 className="w-6 h-6 text-[#66FFB2] animate-spin" />
-                          </div>
-                        )}
-                        {photo.status === 'error' && (
-                          <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-1">
-                             <p className="text-[8px] font-black text-red-500 uppercase tracking-widest leading-none">Fail</p>
-                             <button 
-                               onClick={() => retryPhoto(photo)}
-                               className="bg-white text-black px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-widest active:scale-95 transition-transform"
-                             >
-                               Retry
-                             </button>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="flex flex-col items-center gap-1 opacity-20">
-                        <Package className="w-6 h-6 text-gray-500" />
-                        <span className="text-[8px] font-black uppercase tracking-widest text-gray-500">Item {idx + 1}</span>
+                        </>
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Plus className="w-3 h-3 text-white/20" />
+                        </div>
+                      )}
+                    </motion.button>
+                  );
+                })}
+                <motion.button
+                  layout
+                  onClick={() => !labelPhoto && handleCapture('label')}
+                  disabled={!!labelPhoto}
+                  className={`relative w-12 h-12 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all duration-300 ${labelPhoto ? 'border-[#00c86e] shadow-[0_0_10px_rgba(0,200,110,0.5)]' : 'border-white/10 bg-black/40'} flex items-center justify-center active:scale-95`}
+                >
+                  {labelPhoto ? (
+                    <>
+                      <img src={labelPhoto.url} alt="Label" className="w-full h-full object-cover" />
+                      <div 
+                        onClick={(e) => { e.stopPropagation(); removePhoto(labelPhoto.id); }} 
+                        className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 active:opacity-100 transition-opacity"
+                      >
+                        <Trash2 className="w-4 h-4 text-red-500" />
                       </div>
-                    )}
-                  </motion.div>
-                );
-              })}
-
-              <motion.div
-                layout
-                className={`relative w-28 h-28 flex-shrink-0 rounded-[12px] overflow-hidden border-2 transition-all duration-500 ${labelPhoto ? 'border-[#66FFB2] shadow-[0_0_15px_rgba(102,255,178,0.3)]' : 'border-gray-800 border-dotted'} bg-[#050505] flex items-center justify-center`}
-              >
-                {labelPhoto ? (
-                  <>
-                    <img src={labelPhoto.url} alt="Label" className="w-full h-full object-cover" />
-                    <button onClick={() => removePhoto(labelPhoto.id)} className="absolute top-2 right-2 p-1.5 bg-black/80 backdrop-blur-md rounded-full z-10 border border-white/10 shadow-xl active:scale-90 transition-transform">
-                      <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                    </button>
-                    {labelPhoto.status === 'ready' && (
-                      <div className="absolute top-2 left-2 p-1 bg-[#66FFB2] rounded-full z-10 shadow-[0_0_10px_#66FFB2]">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-black" />
-                      </div>
-                    )}
-                    {labelPhoto.status === 'syncing' && (
-                      <div className="absolute inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center">
-                        <Loader2 className="w-6 h-6 text-[#66FFB2] animate-spin" />
-                      </div>
-                    )}
-                    {labelPhoto.status === 'error' && (
-                      <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-1">
-                         <p className="text-[8px] font-black text-red-500 uppercase tracking-widest leading-none">Fail</p>
-                         <button 
-                           onClick={() => retryPhoto(labelPhoto)}
-                           className="bg-white text-black px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-widest active:scale-95 transition-transform"
-                         >
-                           Retry
-                         </button>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="flex flex-col items-center gap-1 opacity-20">
-                    <Barcode className="w-6 h-6 text-gray-500" />
-                    <span className="text-[8px] font-black uppercase tracking-widest text-gray-500">Label</span>
-                  </div>
-                )}
-              </motion.div>
-            </AnimatePresence>
+                    </>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Barcode className="w-3 h-3 text-white/20" />
+                    </div>
+                  )}
+                </motion.button>
+              </AnimatePresence>
+            </div>
           </div>
+
+          {/* Symmetrical Floating Action Hub */}
+          <div className="absolute bottom-8 left-0 right-0 px-6 flex items-center justify-center gap-4 z-20">
+            <button 
+              onClick={() => handleCapture('item')}
+              disabled={itemPhotos.length >= 4}
+              className="flex-1 min-w-[160px] h-16 bg-[#00c86e] border border-white/10 rounded-full flex items-center justify-center gap-3 active:scale-95 transition-all shadow-[0_10px_30px_rgba(0,200,110,0.3)] disabled:opacity-40"
+            >
+              <Camera className="w-6 h-6 text-white" />
+              <div className="flex flex-col items-start leading-tight">
+                <span className="text-[13px] font-black text-white uppercase tracking-wider">Snap Item</span>
+                <span className="text-[9px] font-bold text-white/70 uppercase tracking-widest">{itemPhotos.length}/4</span>
+              </div>
+            </button>
+
+            <button 
+              onClick={() => handleCapture('label')}
+              disabled={!!labelPhoto}
+              className="flex-1 min-w-[160px] h-16 bg-[#00c86e] border border-white/10 rounded-full flex items-center justify-center gap-3 active:scale-95 transition-all shadow-[0_10px_30px_rgba(0,200,110,0.3)] disabled:opacity-40"
+            >
+              <Barcode className="w-6 h-6 text-white" />
+              <div className="flex flex-col items-start leading-tight">
+                <span className="text-[13px] font-black text-white uppercase tracking-wider">Snap Label #'s</span>
+                <span className="text-[9px] font-bold text-white/70 uppercase tracking-widest">{labelPhoto ? 'Ready' : 'Required'}</span>
+              </div>
+            </button>
+          </div>
+
         </div>
 
-        {/* Data Context */}
-        <div className="px-6 pb-6">
-          <div className="bg-[#0A0A0A] border-2 border-white/5 p-5 rounded-[24px] shadow-2xl">
-            <div className="flex justify-between items-center mb-4">
-              <div className="flex flex-col">
-                <span className="text-[14px] font-black text-gray-500 uppercase tracking-widest mb-1">Store Code</span>
-                <span className="text-[16px] font-black text-white uppercase tracking-widest font-mono">{session?.storecode}</span>
-              </div>
-              <div className="h-10 w-[2px] bg-white/5" />
-              <div className="flex flex-col items-end">
-                <span className="text-[14px] font-black text-gray-500 uppercase tracking-widest mb-1">Session ID</span>
-                <span className="text-[16px] font-black text-white uppercase tracking-widest font-mono">{session?.sessionid}</span>
-              </div>
-            </div>
-            <div className="pt-4 border-t border-white/5 flex items-center justify-between">
-              <span className="text-[16px] font-bold text-[#66FFB2] tracking-wider truncate uppercase">
-                {session?.name || 'GUEST USER'}
+        {/* Full Bleed Footer Navigation */}
+        <div className="flex-1 bg-[#000000] flex flex-col justify-end relative z-30">
+          <div className="text-center pb-5">
+            <p className="text-[10px] font-black text-[#00c86e]/60 uppercase tracking-[0.25em]">
+              CONSOLIDATE ITEMS TO AVOID LAG
+            </p>
+          </div>
+
+          <div className="flex flex-col">
+            <button
+              onClick={handleHandoff}
+              disabled={!allPhotosReady}
+              className={`
+                w-full py-8 text-[16px] font-black uppercase tracking-[0.4em] transition-all relative overflow-hidden
+                ${allPhotosReady 
+                  ? 'bg-[#00c86e] text-black active:opacity-90' 
+                  : 'bg-[#111111] text-gray-800 cursor-not-allowed'}
+              `}
+            >
+              <span className="relative z-10">
+                {(isSyncing || isUploading) ? 'Processing Assets...' : 'Complete & Proceed'}
               </span>
-              <Edit3 className="w-5 h-5 text-gray-500 opacity-50" />
+              {(isSyncing || isUploading) && (
+                <motion.div 
+                  className="absolute inset-0 bg-white/20"
+                  animate={{ x: ['-100%', '100%'] }}
+                  transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                />
+              )}
+            </button>
+
+            {/* Absolute Bottom Metadata Row */}
+            <div className="bg-black/80 backdrop-blur-md flex justify-between items-center px-6 py-2 border-t border-white/5">
+              <div className="flex gap-4 opacity-20">
+                <span className="text-[7px] font-black text-white uppercase tracking-widest font-mono">
+                  STORE: {session?.storecode}
+                </span>
+                <span className="text-[7px] font-black text-white uppercase tracking-widest font-mono">
+                  SID: {session?.sessionid}
+                </span>
+              </div>
+              <button 
+                onClick={() => window.location.reload()}
+                className="text-[7px] font-black text-white opacity-20 uppercase tracking-widest hover:opacity-100 transition-opacity"
+              >
+                Reset Session
+              </button>
             </div>
           </div>
         </div>
       </main>
 
-      {/* Sticky Bottom Bar - iOS Blur Style */}
-      <div className="fixed bottom-0 left-0 right-0 p-6 bg-black/30 backdrop-blur-xl border-t border-white/5 z-50">
-        <button
-          onClick={handleHandoff}
-          disabled={!allPhotosReady}
-          className={`
-            w-full py-6 rounded-2xl text-[14px] font-extrabold uppercase tracking-[0.25em] transition-all relative overflow-hidden shadow-[0_20px_40px_rgba(0,0,0,0.4)]
-            ${allPhotosReady 
-              ? 'bg-[#66FFB2] text-black active:scale-[0.97]' 
-              : 'bg-[#111] text-gray-600 border border-white/5 cursor-not-allowed'}
-          `}
-        >
-          <span className="relative z-10 whitespace-nowrap">
-            {isSyncing ? 'Processing Assets...' : 'Complete & Proceed'}
-          </span>
-          {isSyncing && (
-            <motion.div 
-              className="absolute inset-0 bg-white/20"
-              animate={{ x: ['-100%', '100%'] }}
-              transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
-            />
-          )}
-        </button>
-      </div>
 
 
       {error && (
         <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 bg-red-600/90 backdrop-blur-md rounded-full border border-red-500 shadow-2xl"
+          initial={{ opacity: 0, scale: 0.9, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.9, y: 20 }}
+          className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] px-6 py-4 bg-red-600/90 backdrop-blur-xl rounded-2xl border border-red-500/50 shadow-2xl text-center"
         >
-          <p className="text-[10px] font-black text-white uppercase tracking-widest whitespace-nowrap">{error}</p>
+          <p className="text-[12px] font-black text-white uppercase tracking-[0.1em]">{error}</p>
         </motion.div>
       )}
     </div>
