@@ -80,20 +80,20 @@ export default function App() {
       // Data Recovery: Precise Parameter Mapping per Final Specs
       const name = params.get('name') || '';
       const totalAmount = params.get('totalAmount') || '';
-      const reportid1 = params.get('reportid1') || params.get('reportId1') || params.get('uniqueId') || '';
+      const uniqueId = params.get('uniqueId') || params.get('reportid1') || params.get('reportId1') || `M2M-${Math.floor(100000 + Math.random() * 900000)}`;
       const email = params.get('email') || '';
       const phoneNumber = params.get('phoneNumber') || '';
       const sessionid = params.get('sessionid') || '';
       const storecode = params.get('storecode') || '';
 
-      if (name || totalAmount || reportid1) {
+      if (name || totalAmount || uniqueId) {
         setSession({
           sessionid: sessionid.toUpperCase().trim(),
           name,
           email,
           phoneNumber,
           totalAmount,
-          reportid1,
+          uniqueId,
           storecode: storecode.toLowerCase().trim(),
           date: params.get('date') || new Date().toISOString().split('T')[0],
           servicesOrdered: params.get('servicesOrdered') || '',
@@ -108,25 +108,32 @@ export default function App() {
     }
 
     const name = params.get('name') || '';
-    const email = params.get('email') || '';
-    const phoneNumber = params.get('phoneNumber') || '';
 
-    // Sync intake form with URL params
-    const { fName, lName } = splitName(name);
+    // Sync intake form with URL params and LocalStorage Recovery
+    const storedUniqueId = localStorage.getItem('m2m_uniqueId');
+    const { fName: urlFName, lName: urlLName } = splitName(params.get('name') || '');
+    
+    // Recover from URL params or localStorage
+    const firstName = urlFName || localStorage.getItem('m2m_firstName') || '';
+    const lastName = urlLName || localStorage.getItem('m2m_lastName') || '';
+    const email = params.get('email') || localStorage.getItem('m2m_email') || '';
+    const phoneNumber = params.get('phoneNumber') || localStorage.getItem('m2m_phone') || '';
+    const totalAmount = params.get('totalAmount') || localStorage.getItem('m2m_totalAmount') || '';
+
     setIntakeData({
-      firstName: fName,
-      lastName: lName,
-      email: email,
-      phone: phoneNumber,
+        firstName,
+        lastName,
+        email,
+        phone: phoneNumber,
     });
     
     const sessionData: SessionData = {
       sessionid: (params.get('sessionid') || generateSessionId()).toUpperCase().trim(),
-      name,
+      name: `${firstName} ${lastName}`.trim(),
       email,
       phoneNumber,
-      totalAmount: '1.00', // Temporary test amount (originally params.get('totalAmount') || '')
-      reportid1: params.get('reportid1') || '',
+      totalAmount,
+      uniqueId: params.get('uniqueId') || params.get('reportid1') || params.get('reportId1') || storedUniqueId || `M2M-${Math.floor(100000 + Math.random() * 900000)}`,
       storecode: (params.get('storecode') || 'DEFAULT').toLowerCase().trim(),
       date: params.get('date') || new Date().toISOString().split('T')[0],
       servicesOrdered: params.get('servicesOrdered') || '',
@@ -135,7 +142,15 @@ export default function App() {
     };
     setSession(sessionData);
 
-    if (!name || !email || !phoneNumber) {
+    // PERSISTENCE: Save core data to localStorage immediately
+    localStorage.setItem('m2m_firstName', firstName);
+    localStorage.setItem('m2m_lastName', lastName);
+    localStorage.setItem('m2m_email', email);
+    localStorage.setItem('m2m_phone', phoneNumber);
+    localStorage.setItem('m2m_totalAmount', totalAmount);
+    localStorage.setItem('m2m_uniqueId', sessionData.uniqueId);
+
+    if (!firstName || !email || !phoneNumber) {
       setMode('intake');
     } else {
       setMode('capture');
@@ -162,7 +177,7 @@ export default function App() {
       setFlash(true);
       setTimeout(() => setFlash(false), 150);
 
-      const photoId = Math.random().toString(36).substring(7);
+      const photoId = `photo-${Date.now()}-${Math.random().toString(36).substring(7)}`;
       const newPhoto: PhotoData = {
         id: photoId,
         url: imageSrc,
@@ -173,6 +188,9 @@ export default function App() {
 
       setPhotos((prev) => [...prev, newPhoto]);
       processAndUpload(imageSrc, photoId, type);
+    } else {
+      console.warn('Capture failed: No screenshot available');
+      setError('Camera not ready. Please wait a second and try again.');
     }
   }, [webcamRef, photos, session]);
 
@@ -237,12 +255,20 @@ export default function App() {
   const handleIntakeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (session) {
+      const fullName = `${intakeData.firstName} ${intakeData.lastName}`;
       setSession({
         ...session,
-        name: `${intakeData.firstName} ${intakeData.lastName}`,
+        name: fullName,
         email: intakeData.email,
         phoneNumber: intakeData.phone,
       });
+
+      // PERSISTENCE: Save updated details to localStorage
+      localStorage.setItem('m2m_firstName', intakeData.firstName);
+      localStorage.setItem('m2m_lastName', intakeData.lastName);
+      localStorage.setItem('m2m_email', intakeData.email);
+      localStorage.setItem('m2m_phone', intakeData.phone);
+      
       setMode('capture');
     }
   };
@@ -271,13 +297,15 @@ export default function App() {
     
     setIsUploading(true);
     try {
-      // Exact mapping from Customer Intake and Session data
-      const firstName = intakeData.firstName.trim();
-      const lastName = intakeData.lastName.trim();
-      const email = intakeData.email.trim();
-      const phone = intakeData.phone.trim();
+      // DATA RECOVERY: Attempt to retrieve from localStorage to survive mobile memory wipes
+      const firstName = localStorage.getItem('m2m_firstName') || intakeData.firstName.trim() || '';
+      const lastName = localStorage.getItem('m2m_lastName') || intakeData.lastName.trim() || '';
+      const email = localStorage.getItem('m2m_email') || intakeData.email.trim() || '';
+      const phone = localStorage.getItem('m2m_phone') || intakeData.phone.trim() || '';
       
-      const { totalAmount, servicesOrdered, reportid1, sessionid, storecode } = session;
+      const uniqueId = localStorage.getItem('m2m_uniqueId') || session.uniqueId || '';
+      const totalAmount = localStorage.getItem('m2m_totalAmount') || session.totalAmount || '0.00';
+      const { servicesOrdered } = session;
       
       // --- Services Formatting Logic ---
       const rawServices = (servicesOrdered || '').replace(/\+/g, ' ');
@@ -293,33 +321,41 @@ export default function App() {
       const basePrice = parseFloat(totalAmount) || 0;
       const formattedPrice = basePrice.toFixed(2);
 
+      // PRODUCTION URL: Finalized Linkage for JotForm Bridge
       const baseUrl = `https://pci.jotform.com/261217230124139`;
-      
-      const params = new URLSearchParams();
-      params.append('name[first]', firstName);
-      params.append('name[last]', lastName);
-      params.append('email', email);
-      params.append('phoneNumber[full]', phone);
-      params.append('totalAmount', formattedPrice);
-      params.append('reportId1', reportid1 || '');
-      params.append('sessionid', sessionid || '');
-      params.append('storecode', storecode || '');
-      params.append('servicesOrdered', formattedServices);
+      const url = `${baseUrl}?` +
+        `uniqueId=${encodeURIComponent(uniqueId)}` +
+        `&totalAmount=${encodeURIComponent(formattedPrice)}` +
+        `&name[first]=${encodeURIComponent(firstName)}` +
+        `&name[last]=${encodeURIComponent(lastName)}` +
+        `&email=${encodeURIComponent(email)}` +
+        `&phoneNumber=${encodeURIComponent(phone)}` +
+        `&servicesOrdered=${encodeURIComponent(formattedServices)}`;
 
-      window.location.href = `${baseUrl}?${params.toString()}`;
+      console.log('PRODUCTION HANDOFF TRIGGERED:', url);
+      
+      // PRODUCTION CLEARANCE: Wipe session storage only AFTER successful setup
+      localStorage.removeItem('m2m_firstName');
+      localStorage.removeItem('m2m_lastName');
+      localStorage.removeItem('m2m_email');
+      localStorage.removeItem('m2m_phone');
+      localStorage.removeItem('m2m_totalAmount');
+      localStorage.removeItem('m2m_uniqueId');
+      
+      window.location.href = url;
     } catch (err) {
-      console.error('Handoff error:', err);
-      setError('Redirect failed. Please check your connection.');
+      console.error('Handoff Critical Failure:', err);
+      setError('Connection interrupted. Please refresh and try again.');
     } finally {
-      // Use a brief delay to allow redirect to initiate before unlocking button
-      setTimeout(() => setIsUploading(false), 2000);
+      setIsUploading(false);
     }
   };
 
   const isSyncing = photos.some(p => p.status === 'syncing');
   const hasItem = photos.some(p => p.type === 'item' && p.status === 'ready');
   const hasLabel = photos.some(p => p.type === 'label' && p.status === 'ready');
-  const allPhotosReady = (hasItem || hasLabel) && !isSyncing && !isUploading;
+  // Both at least one item and the label are REQUIRED for the button to be available
+  const allPhotosReady = hasItem && hasLabel && !isSyncing && !isUploading;
 
   const itemPhotos = photos.filter(p => p.type === 'item');
   const labelPhoto = photos.find(p => p.type === 'label');
@@ -333,8 +369,8 @@ export default function App() {
 
   if (mode === 'success') {
     const params = new URLSearchParams(window.location.search);
-    // Precise Mapping per Final Specification: reportid1, name, totalAmount
-    const displayId = (params.get('reportid1') || params.get('reportId1') || params.get('uniqueId') || session?.reportid1 || '000000').replace('M2M-', '');
+    // Precise Mapping per Final Specification: uniqueId, name, totalAmount
+    const displayId = (params.get('uniqueId') || params.get('reportid1') || params.get('reportId1') || session?.uniqueId || '000000').replace('M2M-', '');
     const displayName = params.get('name') || session?.name || 'Customer Verified';
     const displayTotal = params.get('totalAmount') || session?.totalAmount || '0.00';
     
@@ -499,7 +535,7 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen w-full bg-[#000000] text-white font-sans flex flex-col overflow-hidden relative">
+    <div className="min-h-screen w-full bg-[#000000] text-white font-sans flex flex-col relative pb-[40px]">
       <AnimatePresence>
         {flash && (
           <motion.div 
@@ -511,27 +547,28 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <main className="flex-1 relative flex flex-col overflow-hidden">
+      <main className="flex-1 relative flex flex-col">
         {/* Immersive Viewfinder */}
         <div className="relative h-[85vh] w-full bg-[#000000] overflow-hidden shrink-0 z-10">
-          <Webcam
-            audio={false}
-            muted
-            playsInline
-            ref={webcamRef}
-            screenshotFormat="image/webp"
-            onUserMedia={() => setCameraError(null)}
-            onUserMediaError={(err: any) => {
-              console.error("Camera Error:", err);
-              setCameraError(err.toString());
-            }}
-            videoConstraints={{
-              facingMode: { ideal: "environment" },
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
-            }}
-            className="w-full h-full object-cover"
-          />
+            <Webcam
+              audio={false}
+              muted
+              playsInline
+              ref={webcamRef}
+              screenshotFormat="image/jpeg"
+              screenshotQuality={0.9}
+              onUserMedia={() => setCameraError(null)}
+              onUserMediaError={(err: any) => {
+                console.error("Camera Hardware Error:", err);
+                setCameraError("Camera access denied or unavailable.");
+              }}
+              videoConstraints={{
+                facingMode: { ideal: "environment" },
+                width: { ideal: 1920 },
+                height: { ideal: 1080 }
+              }}
+              className="w-full h-full object-cover"
+            />
           
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/40 pointer-events-none" />
 
@@ -587,6 +624,16 @@ export default function App() {
                           >
                             <Trash2 className="w-4 h-4 text-red-500" />
                           </div>
+                          {photo.status === 'syncing' && (
+                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                              <Loader2 className="w-4 h-4 text-[#00c86e] animate-spin" />
+                            </div>
+                          )}
+                          {photo.status === 'error' && (
+                            <div className="absolute inset-0 bg-red-900/80 flex items-center justify-center">
+                              <Trash2 className="w-4 h-4 text-white" />
+                            </div>
+                          )}
                         </>
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
@@ -611,6 +658,16 @@ export default function App() {
                       >
                         <Trash2 className="w-4 h-4 text-red-500" />
                       </div>
+                      {labelPhoto.status === 'syncing' && (
+                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                          <Loader2 className="w-4 h-4 text-[#00c86e] animate-spin" />
+                        </div>
+                      )}
+                      {labelPhoto.status === 'error' && (
+                        <div className="absolute inset-0 bg-red-900/80 flex items-center justify-center">
+                          <Trash2 className="w-4 h-4 text-white" />
+                        </div>
+                      )}
                     </>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
@@ -651,10 +708,10 @@ export default function App() {
 
         </div>
 
-        {/* Full Bleed Footer Navigation */}
-        <div className="flex-1 bg-[#000000] flex flex-col justify-end relative z-30">
-          <div className="text-center pb-5">
-            <p className="text-[10px] font-black text-[#00c86e]/60 uppercase tracking-[0.25em]">
+        {/* Full Bleed Footer Navigation with safe area padding */}
+        <div className="flex-1 bg-[#000000] flex flex-col justify-end relative z-30 pb-4">
+          <div className="text-center pb-6">
+            <p className="text-[10px] font-black text-[#66FFB2] uppercase tracking-[0.25em]">
               CONSOLIDATE ITEMS TO AVOID LAG
             </p>
           </div>
@@ -666,38 +723,34 @@ export default function App() {
               className={`
                 w-full py-8 text-[16px] font-black uppercase tracking-[0.4em] transition-all relative overflow-hidden
                 ${allPhotosReady 
-                  ? 'bg-[#00c86e] text-black active:opacity-90' 
+                  ? 'bg-[#00c86e] text-white active:opacity-90 active:scale-[0.99] shadow-[0_-10px_40px_rgba(0,200,110,0.4)]' 
                   : 'bg-[#111111] text-gray-800 cursor-not-allowed'}
               `}
             >
               <span className="relative z-10">
                 {(isSyncing || isUploading) ? 'Processing Assets...' : 'Complete & Proceed'}
               </span>
-              {(isSyncing || isUploading) && (
-                <motion.div 
-                  className="absolute inset-0 bg-white/20"
-                  animate={{ x: ['-100%', '100%'] }}
-                  transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                />
-              )}
             </button>
 
-            {/* Absolute Bottom Metadata Row */}
-            <div className="bg-black/80 backdrop-blur-md flex justify-between items-center px-6 py-2 border-t border-white/5">
-              <div className="flex gap-4 opacity-20">
-                <span className="text-[7px] font-black text-white uppercase tracking-widest font-mono">
-                  STORE: {session?.storecode}
+            {/* Absolute Bottom Metadata Row - Read Only Lockdown */}
+            <div className="bg-black/95 backdrop-blur-md flex justify-between items-center px-6 py-4 border-t border-white/10">
+              <div className="flex flex-col gap-1">
+                <span className="text-[9px] font-black text-white/40 uppercase tracking-[0.2em] font-mono">
+                  STORE
                 </span>
-                <span className="text-[7px] font-black text-white uppercase tracking-widest font-mono">
-                  SID: {session?.sessionid}
+                <span className="text-[12px] font-black text-white/80 uppercase tracking-[0.1em] font-mono">
+                  {session?.storecode}
                 </span>
               </div>
-              <button 
-                onClick={() => window.location.reload()}
-                className="text-[7px] font-black text-white opacity-20 uppercase tracking-widest hover:opacity-100 transition-opacity"
-              >
-                Reset Session
-              </button>
+              
+              <div className="flex flex-col gap-1 items-end">
+                <span className="text-[9px] font-black text-white/40 uppercase tracking-[0.2em] font-mono">
+                  ORDER ID
+                </span>
+                <span className="text-[13px] font-black text-[#00c86e] uppercase tracking-[0.05em] font-mono whitespace-nowrap">
+                  {session?.uniqueId}
+                </span>
+              </div>
             </div>
           </div>
         </div>

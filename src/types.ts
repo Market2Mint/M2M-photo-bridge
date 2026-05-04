@@ -12,7 +12,7 @@ export interface SessionData {
   email: string;
   phoneNumber: string;
   totalAmount: string;
-  reportid1: string;
+  uniqueId: string;
   storecode: string;
   date: string;
   servicesOrdered: string;
