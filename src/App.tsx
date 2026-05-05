@@ -119,6 +119,7 @@ export default function App() {
     const email = params.get('email') || localStorage.getItem('m2m_email') || '';
     const phoneNumber = params.get('phoneNumber') || localStorage.getItem('m2m_phone') || '';
     const totalAmount = params.get('totalAmount') || localStorage.getItem('m2m_totalAmount') || '';
+    const incomingUniqueId = params.get('uniqueId') || params.get('reportid1') || params.get('reportId1');
 
     setIntakeData({
         firstName,
@@ -127,13 +128,17 @@ export default function App() {
         phone: phoneNumber,
     });
     
+    // ID INTEGRITY: Priority for uniqueId: URL Params -> LocalStorage -> Random Generation (Last Resort)
+    const urlUniqueId = params.get('uniqueId') || params.get('reportid1') || params.get('reportId1');
+    const finalUniqueId = urlUniqueId || storedUniqueId || `M2M-${Math.floor(100000 + Math.random() * 900000)}`;
+
     const sessionData: SessionData = {
       sessionid: (params.get('sessionid') || generateSessionId()).toUpperCase().trim(),
       name: `${firstName} ${lastName}`.trim(),
       email,
       phoneNumber,
       totalAmount,
-      uniqueId: params.get('uniqueId') || params.get('reportid1') || params.get('reportId1') || storedUniqueId || `M2M-${Math.floor(100000 + Math.random() * 900000)}`,
+      uniqueId: finalUniqueId,
       storecode: (params.get('storecode') || 'DEFAULT').toLowerCase().trim(),
       date: params.get('date') || new Date().toISOString().split('T')[0],
       servicesOrdered: params.get('servicesOrdered') || '',
@@ -142,13 +147,13 @@ export default function App() {
     };
     setSession(sessionData);
 
-    // PERSISTENCE: Save core data to localStorage immediately
+    // PERSISTENCE LOCK: Save locked production data immediately to survive camera sessions
     localStorage.setItem('m2m_firstName', firstName);
     localStorage.setItem('m2m_lastName', lastName);
     localStorage.setItem('m2m_email', email);
     localStorage.setItem('m2m_phone', phoneNumber);
     localStorage.setItem('m2m_totalAmount', totalAmount);
-    localStorage.setItem('m2m_uniqueId', sessionData.uniqueId);
+    localStorage.setItem('m2m_uniqueId', finalUniqueId);
 
     if (!firstName || !email || !phoneNumber) {
       setMode('intake');
@@ -307,29 +312,29 @@ export default function App() {
       const totalAmount = localStorage.getItem('m2m_totalAmount') || session.totalAmount || '0.00';
       const { servicesOrdered } = session;
       
-      // --- Services Formatting Logic ---
+      // --- Services Formatting Logic: Linkage Format [Service] — EST: [Time] ---
       const rawServices = (servicesOrdered || '').replace(/\+/g, ' ');
-      const serviceItems = rawServices.split('|').map(s => s.trim()).filter(Boolean);
       
-      const formattedServices = serviceItems.map(item => {
-        if (item.toLowerCase().includes('shipping') || item.toLowerCase().includes('insurance')) {
-          return item;
-        }
-        return `- ${item}`;
-      }).join('\n');
+      // Clean and format services to be single-line per pair in the JotForm email bridge
+      const formattedServices = rawServices
+        .replace(/\s*\|\s*[Ee]st:\s*/gi, ' — EST: ') // Case-insensitive replace for separator
+        .split('|')
+        .map(s => s.trim())
+        .filter(Boolean)
+        .join(', ');
       
       const basePrice = parseFloat(totalAmount) || 0;
       const formattedPrice = basePrice.toFixed(2);
 
-      // PRODUCTION URL: Finalized Linkage for JotForm Bridge
+      // PRODUCTION URL: Absolute Precise Mapping to JotForm Field Specs
       const baseUrl = `https://pci.jotform.com/261217230124139`;
       const url = `${baseUrl}?` +
         `uniqueId=${encodeURIComponent(uniqueId)}` +
-        `&totalAmount=${encodeURIComponent(formattedPrice)}` +
         `&name[first]=${encodeURIComponent(firstName)}` +
         `&name[last]=${encodeURIComponent(lastName)}` +
         `&email=${encodeURIComponent(email)}` +
         `&phoneNumber=${encodeURIComponent(phone)}` +
+        `&totalAmount=${encodeURIComponent(formattedPrice)}` +
         `&servicesOrdered=${encodeURIComponent(formattedServices)}`;
 
       console.log('PRODUCTION HANDOFF TRIGGERED:', url);

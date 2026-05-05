@@ -1,5 +1,5 @@
 {
-  "name": "M2M Photo Bridge- Live",
+  "name": "M2M Photo Bridge- 5/4/26 Live",
   "description": "A background image-syncing bridge for M2M Assistant, capturing and syncing photos to Firebase Storage.",
   "requestFramePermissions": [
     "camera"
