@@ -113,13 +113,15 @@ export default function App() {
     const storedUniqueId = localStorage.getItem('m2m_uniqueId');
     const { fName: urlFName, lName: urlLName } = splitName(params.get('name') || '');
     
-    // Recover from URL params or localStorage
-    const firstName = urlFName || localStorage.getItem('m2m_firstName') || '';
-    const lastName = urlLName || localStorage.getItem('m2m_lastName') || '';
+    const firstName = params.get('firstName') || params.get('first_name') || urlFName || localStorage.getItem('m2m_firstName') || '';
+    const lastName = params.get('lastName') || params.get('last_name') || urlLName || localStorage.getItem('m2m_lastName') || '';
     const email = params.get('email') || localStorage.getItem('m2m_email') || '';
-    const phoneNumber = params.get('phoneNumber') || localStorage.getItem('m2m_phone') || '';
+    const phoneNumber = params.get('phoneNumber') || params.get('phone') || localStorage.getItem('m2m_phone') || '';
     const totalAmount = params.get('totalAmount') || localStorage.getItem('m2m_totalAmount') || '';
-    const incomingUniqueId = params.get('uniqueId') || params.get('reportid1') || params.get('reportId1');
+    const urlUniqueId = params.get('uniqueId') || params.get('reportid1') || params.get('reportId1');
+    
+    // ID INTEGRITY: Priority for uniqueId: URL Params -> LocalStorage -> Random Generation (Locked)
+    const finalUniqueId = urlUniqueId || storedUniqueId || `M2M-${Math.floor(100000 + Math.random() * 900000)}`;
 
     setIntakeData({
         firstName,
@@ -128,10 +130,6 @@ export default function App() {
         phone: phoneNumber,
     });
     
-    // ID INTEGRITY: Priority for uniqueId: URL Params -> LocalStorage -> Random Generation (Last Resort)
-    const urlUniqueId = params.get('uniqueId') || params.get('reportid1') || params.get('reportId1');
-    const finalUniqueId = urlUniqueId || storedUniqueId || `M2M-${Math.floor(100000 + Math.random() * 900000)}`;
-
     const sessionData: SessionData = {
       sessionid: (params.get('sessionid') || generateSessionId()).toUpperCase().trim(),
       name: `${firstName} ${lastName}`.trim(),
@@ -147,7 +145,7 @@ export default function App() {
     };
     setSession(sessionData);
 
-    // PERSISTENCE LOCK: Save locked production data immediately to survive camera sessions
+    // PERSISTENCE LOCK: Capture and save all production data immediately
     localStorage.setItem('m2m_firstName', firstName);
     localStorage.setItem('m2m_lastName', lastName);
     localStorage.setItem('m2m_email', email);
@@ -302,22 +300,22 @@ export default function App() {
     
     setIsUploading(true);
     try {
-      // DATA RECOVERY: Attempt to retrieve from localStorage to survive mobile memory wipes
+      // SOURCE LOCK: Pull directly from localStorage to guarantee non-scrambled production data
+      const uniqueId = localStorage.getItem('m2m_uniqueId') || session.uniqueId || '';
+      const totalAmount = localStorage.getItem('m2m_totalAmount') || session.totalAmount || '0.00';
       const firstName = localStorage.getItem('m2m_firstName') || intakeData.firstName.trim() || '';
       const lastName = localStorage.getItem('m2m_lastName') || intakeData.lastName.trim() || '';
       const email = localStorage.getItem('m2m_email') || intakeData.email.trim() || '';
       const phone = localStorage.getItem('m2m_phone') || intakeData.phone.trim() || '';
       
-      const uniqueId = localStorage.getItem('m2m_uniqueId') || session.uniqueId || '';
-      const totalAmount = localStorage.getItem('m2m_totalAmount') || session.totalAmount || '0.00';
       const { servicesOrdered } = session;
       
-      // --- Services Formatting Logic: Linkage Format [Service] — EST: [Time] ---
+      // --- Services Formatting Logic: Extreme Flattening to Avoid Email Wrapping ---
       const rawServices = (servicesOrdered || '').replace(/\+/g, ' ');
       
-      // Clean and format services to be single-line per pair in the JotForm email bridge
+      // Map to "[Service Name] — EST: [Date]" and join with simple comma to stay on one line
       const formattedServices = rawServices
-        .replace(/\s*\|\s*[Ee]st:\s*/gi, ' — EST: ') // Case-insensitive replace for separator
+        .replace(/\s*\|\s*[Ee]st:\s*/gi, ' — EST: ')
         .split('|')
         .map(s => s.trim())
         .filter(Boolean)
@@ -326,15 +324,15 @@ export default function App() {
       const basePrice = parseFloat(totalAmount) || 0;
       const formattedPrice = basePrice.toFixed(2);
 
-      // PRODUCTION URL: Absolute Precise Mapping to JotForm Field Specs
-      const baseUrl = `https://pci.jotform.com/261217230124139`;
+      // PRODUCTION URL: Exact Hard-Coded Mapping for JotForm PCI Bridge
+      const baseUrl = `https://pci.jotform.com/form/261217230124139`;
       const url = `${baseUrl}?` +
         `uniqueId=${encodeURIComponent(uniqueId)}` +
+        `&totalAmount=${encodeURIComponent(formattedPrice)}` +
         `&name[first]=${encodeURIComponent(firstName)}` +
         `&name[last]=${encodeURIComponent(lastName)}` +
         `&email=${encodeURIComponent(email)}` +
         `&phoneNumber=${encodeURIComponent(phone)}` +
-        `&totalAmount=${encodeURIComponent(formattedPrice)}` +
         `&servicesOrdered=${encodeURIComponent(formattedServices)}`;
 
       console.log('PRODUCTION HANDOFF TRIGGERED:', url);
