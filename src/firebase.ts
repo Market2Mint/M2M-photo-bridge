@@ -3,13 +3,13 @@ import { getStorage } from 'firebase/storage';
 import { getAuth } from 'firebase/auth';
 import fallbackConfig from '../firebase-applet-config.json';
 
-// Use environment variables if available, otherwise fallback to the applet config
+// Hard-coded config for gen-lang-client-0110207 stability
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || fallbackConfig.apiKey,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || fallbackConfig.authDomain,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || fallbackConfig.projectId,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || fallbackConfig.storageBucket,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || fallbackConfig.appId,
+  projectId: "gen-lang-client-0110207347",
+  appId: "1:564116642975:web:1b1337d5aa9843a07256aa",
+  apiKey: "AIzaSyDCX6gzbCEMfz1YtugUi7AAbE7TArma4wk",
+  authDomain: "gen-lang-client-0110207347.firebaseapp.com",
+  storageBucket: "gen-lang-client-0110207347.firebasestorage.app",
 };
 
 const app = initializeApp(firebaseConfig);

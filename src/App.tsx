@@ -44,6 +44,56 @@ const FloatingInput = ({ label, value, onChange, type = "text", icon: Icon, requ
   );
 };
 
+const CaptureWindow = ({ label, photo, onCapture, onRemove, icon: Icon, required = false, small = false }: any) => {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="text-center px-1">
+        <span className="text-[11px] font-black text-[#00FF88] uppercase tracking-widest leading-none whitespace-nowrap">{label}</span>
+      </div>
+      <button
+        onClick={() => !photo && onCapture()}
+        className={`
+          relative w-full aspect-square rounded-xl overflow-hidden border-2 transition-all duration-300
+          ${photo ? 'border-[#00FF88] shadow-[0_0_20px_rgba(0,255,136,0.2)]' : 'border-[#00FF88]/30 bg-[#050505] active:scale-[0.98]'}
+          flex flex-col items-center justify-center group
+        `}
+      >
+        {photo ? (
+          <>
+            <img src={photo.url} alt={label} className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+               <div 
+                 onClick={(e) => { e.stopPropagation(); onRemove(); }}
+                 className="p-3 bg-red-500 rounded-full text-white active:scale-90 transition-all shadow-xl cursor-pointer pointer-events-auto"
+               >
+                 <Trash2 className="w-6 h-6" />
+               </div>
+            </div>
+            {photo.status === 'syncing' && (
+              <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-2">
+                 <Loader2 className="w-7 h-7 text-[#00FF88] animate-spin" />
+                 <span className="text-[10px] font-black text-[#00FF88] uppercase tracking-widest">Syncing</span>
+              </div>
+            )}
+            {photo.status === 'error' && (
+              <div className="absolute inset-0 bg-red-900/80 flex flex-col items-center justify-center gap-2">
+                 <Trash2 className="w-7 h-7 text-white" />
+                 <span className="text-[10px] font-black text-white uppercase tracking-widest">Error</span>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="flex flex-col items-center gap-2">
+            <div className={`p-3 rounded-full bg-[#00FF88]/5 transition-colors ${required ? 'group-active:bg-[#00FF88]/20' : 'group-active:bg-[#00FF88]/10'}`}>
+              <Icon className="w-7 h-7 text-[#00FF88]" />
+            </div>
+          </div>
+        )}
+      </button>
+    </div>
+  );
+};
+
 export default function App() {
   const [session, setSession] = useState<SessionData | null>(null);
   const [photos, setPhotos] = useState<PhotoData[]>([]);
@@ -77,12 +127,12 @@ export default function App() {
     if (params.get('status') === 'success') {
       setSuccessOrderId(params.get('orderId'));
       
-      // Data Recovery: Precise Parameter Mapping per Final Specs
+      // Data Recovery for Success View
       const name = params.get('name') || '';
-      const totalAmount = params.get('totalAmount') || '';
-      const uniqueId = params.get('uniqueId') || params.get('reportid1') || params.get('reportId1') || `M2M-${Math.floor(100000 + Math.random() * 900000)}`;
+      const totalAmount = params.get('totalAmount') || params.get('totalamount') || '';
+      const uniqueId = params.get('uniqueId') || params.get('reportid1') || params.get('reportId1') || params.get('reportID1') || localStorage.getItem('m2m_uniqueId') || `M2M-${Math.floor(100000 + Math.random() * 900000)}`;
       const email = params.get('email') || '';
-      const phoneNumber = params.get('phoneNumber') || '';
+      const phoneNumber = params.get('phoneNumber') || params.get('phone') || '';
       const sessionid = params.get('sessionid') || '';
       const storecode = params.get('storecode') || '';
 
@@ -109,51 +159,59 @@ export default function App() {
 
     const name = params.get('name') || '';
 
-    // Sync intake form with URL params and LocalStorage Recovery
+    // --- 1. DATA CAPTURE AND ID INTEGRITY (QR LOAD SYNC) ---
+    const urlUniqueId = params.get('uniqueId') || params.get('reportid1') || params.get('reportId1') || params.get('reportID1');
     const storedUniqueId = localStorage.getItem('m2m_uniqueId');
-    const { fName: urlFName, lName: urlLName } = splitName(params.get('name') || '');
     
+    // FORCE FIX: If uniqueId is in the URL, it is the absolute priority. Do not generate a random ID.
+    const finalUniqueId = urlUniqueId || storedUniqueId || `M2M-${Math.floor(100000 + Math.random() * 900000)}`;
+
+    const { fName: urlFName, lName: urlLName } = splitName(params.get('name') || '');
     const firstName = params.get('firstName') || params.get('first_name') || urlFName || localStorage.getItem('m2m_firstName') || '';
     const lastName = params.get('lastName') || params.get('last_name') || urlLName || localStorage.getItem('m2m_lastName') || '';
     const email = params.get('email') || localStorage.getItem('m2m_email') || '';
-    const phoneNumber = params.get('phoneNumber') || params.get('phone') || localStorage.getItem('m2m_phone') || '';
-    const totalAmount = params.get('totalAmount') || localStorage.getItem('m2m_totalAmount') || '';
-    const urlUniqueId = params.get('uniqueId') || params.get('reportid1') || params.get('reportId1');
-    
-    // ID INTEGRITY: Priority for uniqueId: URL Params -> LocalStorage -> Random Generation (Locked)
-    const finalUniqueId = urlUniqueId || storedUniqueId || `M2M-${Math.floor(100000 + Math.random() * 900000)}`;
+    const phone = params.get('phone') || params.get('phoneNumber') || localStorage.getItem('m2m_phone') || '';
+    const totalAmount = params.get('totalAmount') || params.get('totalamount') || localStorage.getItem('m2m_totalAmount') || '';
+    const servicesOrdered = params.get('servicesOrdered') || localStorage.getItem('m2m_servicesOrdered') || '';
+    const customernotes = params.get('customernotes') || localStorage.getItem('m2m_customernotes') || '';
+    const storecode = (params.get('storecode') || localStorage.getItem('m2m_storecode') || 'DEFAULT').toLowerCase().trim();
 
+    // Save captures to intake state and session
     setIntakeData({
         firstName,
         lastName,
         email,
-        phone: phoneNumber,
+        phone,
     });
     
     const sessionData: SessionData = {
       sessionid: (params.get('sessionid') || generateSessionId()).toUpperCase().trim(),
       name: `${firstName} ${lastName}`.trim(),
       email,
-      phoneNumber,
+      phoneNumber: phone,
       totalAmount,
       uniqueId: finalUniqueId,
-      storecode: (params.get('storecode') || 'DEFAULT').toLowerCase().trim(),
+      storecode,
       date: params.get('date') || new Date().toISOString().split('T')[0],
-      servicesOrdered: params.get('servicesOrdered') || '',
-      totalamountBridge: params.get('totalamountBridge') || '',
-      customernotes: params.get('customernotes') || '',
+      servicesOrdered,
+      totalamountBridge: totalAmount,
+      customernotes,
     };
     setSession(sessionData);
 
-    // PERSISTENCE LOCK: Capture and save all production data immediately
+    // --- 2. PERSISTENCE LOCKDOWN (QR SURVIVAL) ---
+    // Save all production values to localStorage immediately to survive camera sessions
     localStorage.setItem('m2m_firstName', firstName);
     localStorage.setItem('m2m_lastName', lastName);
     localStorage.setItem('m2m_email', email);
-    localStorage.setItem('m2m_phone', phoneNumber);
+    localStorage.setItem('m2m_phone', phone);
     localStorage.setItem('m2m_totalAmount', totalAmount);
     localStorage.setItem('m2m_uniqueId', finalUniqueId);
+    localStorage.setItem('m2m_servicesOrdered', servicesOrdered);
+    localStorage.setItem('m2m_customernotes', customernotes);
+    localStorage.setItem('m2m_storecode', storecode);
 
-    if (!firstName || !email || !phoneNumber) {
+    if (!firstName || !email || !phone) {
       setMode('intake');
     } else {
       setMode('capture');
@@ -295,55 +353,50 @@ export default function App() {
                         isEmailValid(intakeData.email) && 
                         isPhoneValid(intakeData.phone);
 
-  const handleHandoff = async () => {
+  const handleSubmit = async () => {
     if (!session || isSyncing || isUploading) return;
     
     setIsUploading(true);
     try {
-      // SOURCE LOCK: Pull directly from localStorage to guarantee non-scrambled production data
+      // --- FINAL PRODUCTION HANDOFF CONFIGURATION ---
+      // Source strictly from localStorage first to guarantee non-scrambled production data
       const uniqueId = localStorage.getItem('m2m_uniqueId') || session.uniqueId || '';
       const totalAmount = localStorage.getItem('m2m_totalAmount') || session.totalAmount || '0.00';
       const firstName = localStorage.getItem('m2m_firstName') || intakeData.firstName.trim() || '';
       const lastName = localStorage.getItem('m2m_lastName') || intakeData.lastName.trim() || '';
       const email = localStorage.getItem('m2m_email') || intakeData.email.trim() || '';
       const phone = localStorage.getItem('m2m_phone') || intakeData.phone.trim() || '';
+      const storecode = localStorage.getItem('m2m_storecode') || session.storecode || '';
+      const customernotes = localStorage.getItem('m2m_customernotes') || session.customernotes || '';
+      const rawServices = localStorage.getItem('m2m_servicesOrdered') || session.servicesOrdered || '';
       
-      const { servicesOrdered } = session;
+      // --- 'Beautiful' Email Formatting (Transformation) ---
+      // Rebuild as vertical list with dots and line breaks for professional JotForm emails
+      const serviceBlocks = rawServices.split('|').map(s => s.trim()).filter(Boolean);
+      const formattedServices = serviceBlocks.map((block, index) => {
+        // Expected Format: [Service Name] — EST: [Date]
+        const parts = block.split(/ — EST: /i);
+        const name = (parts[0] || '').trim() || 'Unknown Item';
+        return `${index + 1}. ITEM: ${name} <br> `;
+      }).join('');
       
-      // --- Services Formatting Logic: Extreme Flattening to Avoid Email Wrapping ---
-      const rawServices = (servicesOrdered || '').replace(/\+/g, ' ');
-      
-      // Map to "[Service Name] — EST: [Date]" and join with simple comma to stay on one line
-      const formattedServices = rawServices
-        .replace(/\s*\|\s*[Ee]st:\s*/gi, ' — EST: ')
-        .split('|')
-        .map(s => s.trim())
-        .filter(Boolean)
-        .join(', ');
-      
-      const basePrice = parseFloat(totalAmount) || 0;
-      const formattedPrice = basePrice.toFixed(2);
+      const amt = (parseFloat(totalAmount) || 0).toFixed(2);
+      const encodedServices = encodeURIComponent(formattedServices);
 
-      // PRODUCTION URL: Exact Hard-Coded Mapping for JotForm PCI Bridge
+      // PRECISE JOTFORM MAPPING (Confirmed PCI URL)
+      // Destination: https://pci.jotform.com/form/261217230124139
       const baseUrl = `https://pci.jotform.com/form/261217230124139`;
-      const url = `${baseUrl}?` +
-        `uniqueId=${encodeURIComponent(uniqueId)}` +
-        `&totalAmount=${encodeURIComponent(formattedPrice)}` +
-        `&name[first]=${encodeURIComponent(firstName)}` +
-        `&name[last]=${encodeURIComponent(lastName)}` +
+      const url = `${baseUrl}?totalamountBridge=${amt}` +
+        `&servicesOrdered=${encodedServices}` +
+        `&uniqueId=${encodeURIComponent(uniqueId)}` +
         `&email=${encodeURIComponent(email)}` +
         `&phoneNumber=${encodeURIComponent(phone)}` +
-        `&servicesOrdered=${encodeURIComponent(formattedServices)}`;
+        `&name[first]=${encodeURIComponent(firstName)}` +
+        `&name[last]=${encodeURIComponent(lastName)}` +
+        `&customernotes=${encodeURIComponent(customernotes)}` +
+        `&storecode=${encodeURIComponent(storecode)}`;
 
-      console.log('PRODUCTION HANDOFF TRIGGERED:', url);
-      
-      // PRODUCTION CLEARANCE: Wipe session storage only AFTER successful setup
-      localStorage.removeItem('m2m_firstName');
-      localStorage.removeItem('m2m_lastName');
-      localStorage.removeItem('m2m_email');
-      localStorage.removeItem('m2m_phone');
-      localStorage.removeItem('m2m_totalAmount');
-      localStorage.removeItem('m2m_uniqueId');
+      console.log('FINAL PRODUCTION HANDOFF TRIGGERED:', url);
       
       window.location.href = url;
     } catch (err) {
@@ -373,9 +426,9 @@ export default function App() {
   if (mode === 'success') {
     const params = new URLSearchParams(window.location.search);
     // Precise Mapping per Final Specification: uniqueId, name, totalAmount
-    const displayId = (params.get('uniqueId') || params.get('reportid1') || params.get('reportId1') || session?.uniqueId || '000000').replace('M2M-', '');
+    const displayId = (params.get('uniqueId') || params.get('reportid1') || params.get('reportId1') || params.get('reportID1') || session?.uniqueId || '000000').replace('M2M-', '');
     const displayName = params.get('name') || session?.name || 'Customer Verified';
-    const displayTotal = params.get('totalAmount') || session?.totalAmount || '0.00';
+    const displayTotal = params.get('totalAmount') || params.get('totalamount') || session?.totalAmount || '0.00';
     
     return (
       <div className="h-screen w-full bg-black text-white font-sans flex flex-col items-center justify-start p-0 overflow-hidden relative">
@@ -538,7 +591,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-[#000000] text-white font-sans flex flex-col relative pb-[40px]">
+    <div className="min-h-screen w-full bg-[#000000] text-white font-sans flex flex-col relative pb-0">
       <AnimatePresence>
         {flash && (
           <motion.div 
@@ -550,212 +603,127 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <main className="flex-1 relative flex flex-col">
-        {/* Immersive Viewfinder */}
-        <div className="relative h-[85vh] w-full bg-[#000000] overflow-hidden shrink-0 z-10">
-            <Webcam
-              audio={false}
-              muted
-              playsInline
-              ref={webcamRef}
-              screenshotFormat="image/jpeg"
-              screenshotQuality={0.9}
-              onUserMedia={() => setCameraError(null)}
-              onUserMediaError={(err: any) => {
-                console.error("Camera Hardware Error:", err);
-                setCameraError("Camera access denied or unavailable.");
-              }}
-              videoConstraints={{
-                facingMode: { ideal: "environment" },
-                width: { ideal: 1920 },
-                height: { ideal: 1080 }
-              }}
-              className="w-full h-full object-cover"
-            />
+      <main className="flex-1 flex flex-col bg-black">
+        {/* Viewfinder - Doubled presence */}
+        <div className="relative w-full aspect-[1/1] bg-black overflow-hidden z-10">
+          <Webcam
+            audio={false}
+            muted
+            playsInline
+            ref={webcamRef}
+            screenshotFormat="image/jpeg"
+            screenshotQuality={0.9}
+            onUserMedia={() => setCameraError(null)}
+            onUserMediaError={(err: any) => {
+              console.error("Camera Hardware Error:", err);
+              setCameraError("Camera access denied or unavailable.");
+            }}
+            videoConstraints={{
+              facingMode: { ideal: "environment" },
+              width: { ideal: 1920 },
+              height: { ideal: 1080 }
+            }}
+            className="w-full h-full object-cover grayscale-0 opacity-100"
+          />
+          <div className="absolute inset-0 border-b border-white/20" />
           
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/40 pointer-events-none" />
-
-          {cameraError && (
-            <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center p-6 text-center z-50">
-              <Camera className="w-12 h-12 text-red-500 mb-4 opacity-50" />
-              <p className="text-red-500 font-black uppercase tracking-widest text-[10px] mb-2">Camera Access Failed</p>
-              <p className="text-gray-400 text-[8px] uppercase tracking-wider max-w-[200px] leading-relaxed">
-                Enable camera permissions in settings.
-              </p>
-            </div>
-          )}
-
-          {/* Floating Header Overlays */}
-          <div className="absolute top-6 left-6 flex flex-col gap-1">
+          {/* Overlay Status */}
+          <div className="absolute top-6 left-6">
              <button 
                onClick={() => setMode('intake')}
-               className="p-3 bg-black/40 backdrop-blur-xl border border-white/10 rounded-full text-white active:scale-90 transition-all shadow-2xl"
+               className="p-3 bg-[#00FF88]/5 backdrop-blur-xl border border-[#00FF88]/20 rounded-full text-[#00FF88] active:scale-90 transition-all"
              >
-               <ArrowLeft className="w-5 h-5" />
+               <ArrowLeft className="w-6 h-6" />
              </button>
           </div>
 
           <div className="absolute top-6 right-6">
-             <div className="bg-black/60 backdrop-blur-xl border border-white/20 px-5 py-2.5 rounded-full flex items-center gap-3 shadow-2xl">
-                <span className="text-[14px] font-black text-[#00c86e] uppercase font-mono tracking-tighter">
-                  {itemPhotos.length} / 4
-                </span>
-                <span className="text-[9px] font-bold text-white/70 uppercase tracking-[0.1em]">Photos</span>
-             </div>
-          </div>
-
-          {/* Compact Gallery Strip Overlay */}
-          <div className="absolute bottom-32 left-0 right-0 px-6 overflow-x-auto pointer-events-auto">
-            <div className="flex gap-2 justify-center pb-2">
-              <AnimatePresence mode="popLayout">
-                {[0, 1, 2, 3].map((idx) => {
-                  const photo = itemPhotos[idx];
-                  return (
-                    <motion.button
-                      key={`item-overlay-${idx}`}
-                      layout
-                      onClick={() => !photo && handleCapture('item')}
-                      disabled={!!photo}
-                      className={`relative w-12 h-12 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all duration-300 ${photo ? 'border-[#00c86e]/80 shadow-[0_0_10px_rgba(0,200,110,0.3)]' : 'border-white/10 bg-black/40'} flex items-center justify-center active:scale-95`}
-                    >
-                      {photo ? (
-                        <>
-                          <img src={photo.url} alt="Item" className="w-full h-full object-cover" />
-                          <div 
-                            onClick={(e) => { e.stopPropagation(); removePhoto(photo.id); }} 
-                            className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 active:opacity-100 transition-opacity"
-                          >
-                            <Trash2 className="w-4 h-4 text-red-500" />
-                          </div>
-                          {photo.status === 'syncing' && (
-                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                              <Loader2 className="w-4 h-4 text-[#00c86e] animate-spin" />
-                            </div>
-                          )}
-                          {photo.status === 'error' && (
-                            <div className="absolute inset-0 bg-red-900/80 flex items-center justify-center">
-                              <Trash2 className="w-4 h-4 text-white" />
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Plus className="w-3 h-3 text-white/20" />
-                        </div>
-                      )}
-                    </motion.button>
-                  );
-                })}
-                <motion.button
-                  layout
-                  onClick={() => !labelPhoto && handleCapture('label')}
-                  disabled={!!labelPhoto}
-                  className={`relative w-12 h-12 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all duration-300 ${labelPhoto ? 'border-[#00c86e] shadow-[0_0_10px_rgba(0,200,110,0.5)]' : 'border-white/10 bg-black/40'} flex items-center justify-center active:scale-95`}
-                >
-                  {labelPhoto ? (
-                    <>
-                      <img src={labelPhoto.url} alt="Label" className="w-full h-full object-cover" />
-                      <div 
-                        onClick={(e) => { e.stopPropagation(); removePhoto(labelPhoto.id); }} 
-                        className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 active:opacity-100 transition-opacity"
-                      >
-                        <Trash2 className="w-4 h-4 text-red-500" />
-                      </div>
-                      {labelPhoto.status === 'syncing' && (
-                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                          <Loader2 className="w-4 h-4 text-[#00c86e] animate-spin" />
-                        </div>
-                      )}
-                      {labelPhoto.status === 'error' && (
-                        <div className="absolute inset-0 bg-red-900/80 flex items-center justify-center">
-                          <Trash2 className="w-4 h-4 text-white" />
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Barcode className="w-3 h-3 text-white/20" />
-                    </div>
-                  )}
-                </motion.button>
-              </AnimatePresence>
+            <div className="bg-[#00FF88]/5 backdrop-blur-xl border border-[#00FF88]/20 px-4 py-2 rounded-full flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${allPhotosReady ? 'bg-[#00FF88] animate-pulse' : 'bg-white/10'}`} />
+              <span className="text-[12px] font-black text-[#00FF88] uppercase tracking-[0.2em] font-mono">
+                {allPhotosReady ? 'READY' : 'CAPTURING'}
+              </span>
             </div>
           </div>
-
-          {/* Symmetrical Floating Action Hub */}
-          <div className="absolute bottom-8 left-0 right-0 px-6 flex items-center justify-center gap-4 z-20">
-            <button 
-              onClick={() => handleCapture('item')}
-              disabled={itemPhotos.length >= 4}
-              className="flex-1 min-w-[160px] h-16 bg-[#00c86e] border border-white/10 rounded-full flex items-center justify-center gap-3 active:scale-95 transition-all shadow-[0_10px_30px_rgba(0,200,110,0.3)] disabled:opacity-40"
-            >
-              <Camera className="w-6 h-6 text-white" />
-              <div className="flex flex-col items-start leading-tight">
-                <span className="text-[13px] font-black text-white uppercase tracking-wider">Snap Item</span>
-                <span className="text-[9px] font-bold text-white/70 uppercase tracking-widest">{itemPhotos.length}/4</span>
-              </div>
-            </button>
-
-            <button 
-              onClick={() => handleCapture('label')}
-              disabled={!!labelPhoto}
-              className="flex-1 min-w-[160px] h-16 bg-[#00c86e] border border-white/10 rounded-full flex items-center justify-center gap-3 active:scale-95 transition-all shadow-[0_10px_30px_rgba(0,200,110,0.3)] disabled:opacity-40"
-            >
-              <Barcode className="w-6 h-6 text-white" />
-              <div className="flex flex-col items-start leading-tight">
-                <span className="text-[13px] font-black text-white uppercase tracking-wider">Snap Label #'s</span>
-                <span className="text-[9px] font-bold text-white/70 uppercase tracking-widest">{labelPhoto ? 'Ready' : 'Required'}</span>
-              </div>
-            </button>
-          </div>
-
         </div>
 
-        {/* Full Bleed Footer Navigation with safe area padding */}
-        <div className="flex-1 bg-[#000000] flex flex-col justify-end relative z-30 pb-4">
-          <div className="text-center pb-6">
-            <p className="text-[10px] font-black text-[#66FFB2] uppercase tracking-[0.25em]">
-              CONSOLIDATE ITEMS TO AVOID LAG
-            </p>
+        {/* The Capture Hub - Structural Redesign */}
+        <div className="flex-1 flex flex-col items-center px-4 pt-4 pb-4 overflow-y-auto gap-4">
+          
+          {/* 1. Primary Centered Section */}
+          <div className="grid grid-cols-2 gap-16 w-full max-w-[260px]">
+            {/* IMAGE 1 - Primary Requirement */}
+            <CaptureWindow 
+              label="IMAGE 1" 
+              required={!hasItem} 
+              photo={itemPhotos[0]} 
+              onCapture={() => handleCapture('item')} 
+              onRemove={() => removePhoto(itemPhotos[0].id)}
+              icon={Package}
+            />
+            {/* BARCODE #'s - Primary Requirement */}
+            <CaptureWindow 
+              label="BARCODE #'s" 
+              required={!hasLabel} 
+              photo={labelPhoto} 
+              onCapture={() => handleCapture('label')} 
+              onRemove={() => removePhoto(labelPhoto!.id)}
+              icon={Barcode}
+            />
           </div>
 
-          <div className="flex flex-col">
+          {/* 2. The Anchor Pill - Integrated Flow */}
+          <div className="w-full flex justify-center py-2">
             <button
-              onClick={handleHandoff}
+              onClick={handleSubmit}
               disabled={!allPhotosReady}
               className={`
-                w-full py-8 text-[16px] font-black uppercase tracking-[0.4em] transition-all relative overflow-hidden
+                w-full max-w-[300px] h-14 text-[15px] font-black uppercase tracking-[0.3em] transition-all relative overflow-hidden rounded-full pointer-events-auto
                 ${allPhotosReady 
-                  ? 'bg-[#00c86e] text-white active:opacity-90 active:scale-[0.99] shadow-[0_-10px_40px_rgba(0,200,110,0.4)]' 
-                  : 'bg-[#111111] text-gray-800 cursor-not-allowed'}
+                  ? 'bg-[#00FF88] text-black shadow-[0_10px_40px_rgba(0,255,136,0.3)] hover:scale-[1.02] active:scale-[0.98]' 
+                  : 'bg-[#111111] text-white/20 cursor-not-allowed border border-[#00FF88]/20'}
               `}
             >
-              <span className="relative z-10">
-                {(isSyncing || isUploading) ? 'Processing Assets...' : 'Complete & Proceed'}
-              </span>
+              <div className="relative z-10 flex items-center justify-center gap-2">
+                {(isSyncing || isUploading) ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Syncing...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Complete & Proceed</span>
+                    <ArrowRight className="w-5 h-5" />
+                  </>
+                )}
+              </div>
             </button>
-
-            {/* Absolute Bottom Metadata Row - Read Only Lockdown */}
-            <div className="bg-black/95 backdrop-blur-md flex justify-between items-center px-6 py-4 border-t border-white/10">
-              <div className="flex flex-col gap-1">
-                <span className="text-[9px] font-black text-white/40 uppercase tracking-[0.2em] font-mono">
-                  STORE
-                </span>
-                <span className="text-[12px] font-black text-white/80 uppercase tracking-[0.1em] font-mono">
-                  {session?.storecode}
-                </span>
-              </div>
-              
-              <div className="flex flex-col gap-1 items-end">
-                <span className="text-[9px] font-black text-white/40 uppercase tracking-[0.2em] font-mono">
-                  ORDER ID
-                </span>
-                <span className="text-[13px] font-black text-[#00c86e] uppercase tracking-[0.05em] font-mono whitespace-nowrap">
-                  {session?.uniqueId}
-                </span>
-              </div>
-            </div>
           </div>
+
+          {/* 3. Secondary Row (The Basement) */}
+          <div className="grid grid-cols-3 gap-3 w-full max-w-[320px]">
+            {[1, 2, 3].map((idx) => (
+              <CaptureWindow 
+                key={`extra-${idx}`}
+                label={`ADD ${idx}`}
+                photo={itemPhotos[idx]}
+                onCapture={() => handleCapture('item')}
+                onRemove={() => removePhoto(itemPhotos[idx].id)}
+                icon={Plus}
+                small
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Global Footer Watermark - Locked Position */}
+        <div className="bg-black border-t border-[#00FF88]/30 px-8 py-1.5 flex justify-between items-center z-50">
+          <span className="text-[11px] font-black text-[#00FF88] uppercase tracking-[0.2em] font-mono">
+            {session?.storecode || 'OFFLINE'}
+          </span>
+          <span className="text-[11px] font-black text-[#00FF88] uppercase tracking-[0.2em] font-mono">
+            {new Date().toLocaleDateString()}
+          </span>
         </div>
       </main>
 
