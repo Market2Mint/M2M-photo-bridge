@@ -12,7 +12,6 @@ export interface SessionData {
   email: string;
   phoneNumber: string;
   totalAmount: string;
-  uniqueId: string;
   storecode: string;
   date: string;
   servicesOrdered: string;

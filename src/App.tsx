@@ -143,14 +143,15 @@ export default function App() {
           if (tokenDoc.exists()) {
             const data = tokenDoc.data();
             // 2. THE MEMORY LOCK (TATTOO TO HARD DRIVE)
-            if (data.uniqueId) localStorage.setItem('uniqueId', data.uniqueId);
             if (data.totalamountBridge) localStorage.setItem('totalamountBridge', data.totalamountBridge);
+            if (data.totalAmount) localStorage.setItem('totalAmount', data.totalAmount);
             if (data.servicesOrdered) localStorage.setItem('servicesOrdered', data.servicesOrdered);
             if (data.firstName) localStorage.setItem('name[first]', data.firstName);
             if (data.lastName) localStorage.setItem('name[last]', data.lastName);
             if (data.email) localStorage.setItem('email', data.email);
-            if (data.phone) localStorage.setItem('phone', data.phone);
+            if (data.phone) localStorage.setItem('phoneNumber', data.phone);
             if (data.storecode) localStorage.setItem('storecode', data.storecode);
+            if (data.storeLocation) localStorage.setItem('storecode', data.storeLocation);
             if (data.customernotes) localStorage.setItem('customernotes', data.customernotes);
             
             // Tattoo completed - update active session and form data in background
@@ -173,7 +174,6 @@ export default function App() {
               email: email || prev.email,
               phoneNumber: phone || prev.phoneNumber,
               totalAmount: data.totalamountBridge || prev.totalAmount,
-              uniqueId: data.uniqueId || prev.uniqueId,
               servicesOrdered: data.servicesOrdered || prev.servicesOrdered,
               customernotes: data.customernotes || prev.customernotes,
             } : prev);
@@ -192,20 +192,18 @@ export default function App() {
         
         const name = params.get('name') || '';
         const totalAmount = params.get('totalAmount') || params.get('totalamount') || '';
-        const uniqueId = params.get('uniqueId') || params.get('reportid1') || params.get('reportId1') || params.get('reportID1') || localStorage.getItem('uniqueId') || `M2M-${Math.floor(100000 + Math.random() * 900000)}`;
         const email = params.get('email') || '';
         const phoneNumber = params.get('phoneNumber') || params.get('phone') || '';
         const sessionid = params.get('sessionid') || '';
         const storecode = params.get('storecode') || '';
 
-        if (name || totalAmount || uniqueId) {
+        if (name || totalAmount) {
           setSession({
             sessionid: sessionid.toUpperCase().trim(),
             name,
             email,
             phoneNumber,
             totalAmount,
-            uniqueId,
             storecode: storecode.toLowerCase().trim(),
             date: params.get('date') || new Date().toISOString().split('T')[0],
             servicesOrdered: params.get('servicesOrdered') || '',
@@ -220,7 +218,6 @@ export default function App() {
       }
 
       // --- WHITELIST PROTOCOL: Explicitly facilitate these specific keys from URL or LocalStorage ---
-      const urlUniqueId = params.get('uniqueId') || params.get('uniqueid') || params.get('uniqueidBridge') || params.get('reportid1');
       const urlTotalAmount = params.get('totalamountBridge') || params.get('totalAmount') || params.get('amount');
       const urlServices = params.get('servicesOrdered') || params.get('services');
       const urlFirstName = params.get('name[first]') || params.get('firstName') || params.get('first_name');
@@ -228,28 +225,28 @@ export default function App() {
 
       // Recovery Logic from LocalStorage (Memory Lock Alignment)
       const { fName: urlFName, lName: urlLName } = splitName(params.get('name') || '');
-      const uniqueid = urlUniqueId || localStorage.getItem('uniqueId') || '';
+      const sid = params.get('sessionid') || localStorage.getItem('sessionid') || generateSessionId();
+      const totalAmount = params.get('totalAmount') || params.get('totalamount') || localStorage.getItem('totalAmount') || '';
       const totalamountBridge = urlTotalAmount || localStorage.getItem('totalamountBridge') || '';
       const servicesOrdered = urlServices || localStorage.getItem('servicesOrdered') || '';
       const firstName = urlFirstName || urlFName || localStorage.getItem('name[first]') || '';
       const lastName = urlLastName || urlLName || localStorage.getItem('name[last]') || '';
       const email = params.get('email') || params.get('emailAddress') || localStorage.getItem('email') || '';
-      const phone = params.get('phone') || params.get('phoneNumber') || params.get('cell') || localStorage.getItem('phone') || '';
+      const phone = params.get('phone') || params.get('phoneNumber') || params.get('cell') || localStorage.getItem('phoneNumber') || '';
       const customernotes = params.get('customernotes') || params.get('notes') || localStorage.getItem('customernotes') || '';
-      const storecode = (params.get('storecode') || params.get('store_code') || localStorage.getItem('storecode') || 'DEFAULT').toLowerCase().trim();
+      const storeLocation = (params.get('storecode') || params.get('store_code') || params.get('storeLocation') || localStorage.getItem('storecode') || localStorage.getItem('storeLocation') || 'DEFAULT').toLowerCase().trim();
 
       // --- IMMEDIATE PERSISTENCE (THE TATTOO) ---
-      if (uniqueid) localStorage.setItem('uniqueId', uniqueid);
+      localStorage.setItem('sessionid', sid);
+      if (totalAmount) localStorage.setItem('totalAmount', totalAmount);
       if (totalamountBridge) localStorage.setItem('totalamountBridge', totalamountBridge);
       if (servicesOrdered) localStorage.setItem('servicesOrdered', servicesOrdered);
       if (firstName) localStorage.setItem('name[first]', firstName);
       if (lastName) localStorage.setItem('name[last]', lastName);
       if (email) localStorage.setItem('email', email);
-      if (phone) localStorage.setItem('phone', phone);
+      if (phone) localStorage.setItem('phoneNumber', phone);
       if (customernotes) localStorage.setItem('customernotes', customernotes);
-      if (storecode) localStorage.setItem('storecode', storecode);
-
-      const finalUniqueId = uniqueid || `M2M-${Math.floor(100000 + Math.random() * 900000)}`;
+      localStorage.setItem('storecode', storeLocation);
 
       setIntakeData({
           firstName,
@@ -259,13 +256,12 @@ export default function App() {
       });
       
       const sessionData: SessionData = {
-        sessionid: (params.get('sessionid') || generateSessionId()).toUpperCase().trim(),
+        sessionid: sid.toUpperCase().trim(),
         name: `${firstName} ${lastName}`.trim(),
         email,
         phoneNumber: phone,
-        totalAmount: totalamountBridge,
-        uniqueId: finalUniqueId,
-        storecode,
+        totalAmount: totalAmount || totalamountBridge,
+        storecode: storeLocation,
         date: params.get('date') || new Date().toISOString().split('T')[0],
         servicesOrdered,
         totalamountBridge,
@@ -388,18 +384,33 @@ export default function App() {
       const fullName = `${intakeData.firstName} ${intakeData.lastName}`;
       
       // --- THE TATTOO (DATA PERSISTENCE) ---
-      // 1. Manually entered data
+      // Commit all order data to device memory to survive camera sessions and re-mounts.
       localStorage.setItem('name[first]', intakeData.firstName);
       localStorage.setItem('name[last]', intakeData.lastName);
       localStorage.setItem('email', intakeData.email);
-      localStorage.setItem('phone', intakeData.phone);
+      localStorage.setItem('phoneNumber', intakeData.phone);
+      localStorage.setItem('sessionid', session.sessionid);
       
-      // 2. Retrieved/Bridge data (Sync from state)
-      if (session.uniqueId) localStorage.setItem('uniqueId', session.uniqueId);
-      if (session.totalamountBridge) localStorage.setItem('totalamountBridge', session.totalamountBridge);
-      if (session.servicesOrdered) localStorage.setItem('servicesOrdered', session.servicesOrdered);
-      if (session.storecode) localStorage.setItem('storecode', session.storecode);
-      if (session.customernotes) localStorage.setItem('customernotes', session.customernotes);
+      localStorage.setItem('totalamountBridge', session.totalamountBridge || '');
+      localStorage.setItem('totalAmount', session.totalAmount || '');
+      localStorage.setItem('servicesOrdered', session.servicesOrdered || '');
+      localStorage.setItem('storecode', session.storecode || '');
+      localStorage.setItem('customernotes', session.customernotes || '');
+
+      // --- THE ORDER DATA TATTOO (MANDATORY PAYLOAD) ---
+      const orderData = {
+        'name[first]': intakeData.firstName,
+        'name[last]': intakeData.lastName,
+        email: intakeData.email,
+        phoneNumber: intakeData.phone,
+        sessionid: session.sessionid,
+        servicesOrdered: session.servicesOrdered,
+        totalamountBridge: session.totalamountBridge,
+        totalAmount: session.totalAmount,
+        storecode: session.storecode,
+        customernotes: session.customernotes
+      };
+      localStorage.setItem('orderData', JSON.stringify(orderData));
 
       setSession({
         ...session,
@@ -434,31 +445,38 @@ export default function App() {
   const handleSubmit = async () => {
     if (!session || isSyncing || isUploading) return;
     
+    console.log('LocalStorage Content (orderData):', localStorage.getItem('orderData'));
     setIsUploading(true);
     try {
-      // --- THE FINAL JOTFORM HANDOFF (THE REDIRECT) ---
-      // Use only the 7 specific fields requested. Mapping per SPEC:
-      const total = localStorage.getItem('totalamountBridge') || '';
-      const services = localStorage.getItem('servicesOrdered') || '';
-      const uid = localStorage.getItem('uniqueId') || '';
+      // --- THE FINAL JOTFORM HANDOFF (THE HANDSHAKE) ---
+      // Retrieve the 10 specific parameters from device memory. 
+      // Mapping precisely to JotForm field IDs.
       const fName = localStorage.getItem('name[first]') || '';
       const lName = localStorage.getItem('name[last]') || '';
       const email = localStorage.getItem('email') || '';
-      const phone = localStorage.getItem('phone') || '';
+      const phone = localStorage.getItem('phoneNumber') || '';
+      const sid = localStorage.getItem('sessionid') || '';
+      const notes = localStorage.getItem('customernotes') || '';
+      const bridge = localStorage.getItem('totalamountBridge') || '';
+      const total = localStorage.getItem('totalAmount') || '';
+      const services = localStorage.getItem('servicesOrdered') || '';
       const store = localStorage.getItem('storecode') || '';
 
-      // Raw string concatenation as per requirement
-      const target = 'https://form.jotform.com/261217230124139?' +
-        'totalamountBridge=' + encodeURIComponent(total) + 
-        '&servicesOrdered=' + encodeURIComponent('ID: ' + uid + ' | ' + services) + 
-        '&name[first]=' + encodeURIComponent(fName) + 
+      // GET request to pci.jotform.com with literal field mapping
+      const finalUrl = 'https://pci.jotform.com/form/261217230124139?' +
+        'name[first]=' + encodeURIComponent(fName) + 
         '&name[last]=' + encodeURIComponent(lName) + 
         '&email=' + encodeURIComponent(email) +
         '&phoneNumber=' + encodeURIComponent(phone) +
-        '&storeLocation=' + encodeURIComponent(store);
+        '&sessionid=' + encodeURIComponent(sid) +
+        '&customernotes=' + encodeURIComponent(notes) +
+        '&totalamountBridge=' + encodeURIComponent(bridge) + 
+        '&totalAmount=' + encodeURIComponent(total) + 
+        '&servicesOrdered=' + encodeURIComponent(services) +
+        '&storecode=' + encodeURIComponent(store);
 
-      console.log('MANDATORY HANDOFF REDIRECT:', target);
-      window.location.replace(target);
+      console.log('FINAL CONSTRUCT URL:', finalUrl);
+      window.location.replace(finalUrl);
     } catch (err) {
       console.error('Handoff Critical Failure:', err);
       setError('Connection interrupted. Please refresh and try again.');
@@ -485,8 +503,8 @@ export default function App() {
 
   if (mode === 'success') {
     const params = new URLSearchParams(window.location.search);
-    // Precise Mapping per Final Specification: uniqueId, name, totalAmount
-    const displayId = (params.get('uniqueId') || params.get('reportid1') || params.get('reportId1') || params.get('reportID1') || session?.uniqueId || '000000').replace('M2M-', '');
+    // Precise Mapping per Final Specification: Display ID derived from known JotForm return params
+    const displayId = (params.get('uniqueId') || params.get('reportid1') || params.get('reportId1') || '000000').replace('M2M-', '');
     const displayName = params.get('name') || session?.name || 'Customer Verified';
     const displayTotal = params.get('totalAmount') || params.get('totalamount') || session?.totalAmount || '0.00';
     
