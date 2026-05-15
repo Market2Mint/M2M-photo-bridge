@@ -127,10 +127,6 @@ export default function App() {
       if (refId) {
         localStorage.clear();
         console.log('NEW ORDER DETECTED - SCRUBBED LOCALSTORAGE');
-        
-        // --- 1. ZERO-LATENCY NAVIGATION (THE GREEN PILL) ---
-        // Immediately push to Page 2 (Camera) - No blocking hangs
-        setMode('capture');
       }
 
       // --- EMERGENCY PERSISTENCE: RE-TATTOO CURRENT PARAMS ---
@@ -157,12 +153,25 @@ export default function App() {
             if (data.storecode) localStorage.setItem('storecode', data.storecode);
             if (data.customernotes) localStorage.setItem('customernotes', data.customernotes);
             
-            // Tattoo completed - update active session in background
+            // Tattoo completed - update active session and form data in background
+            const firstName = data.firstName || '';
+            const lastName = data.lastName || '';
+            const email = data.email || '';
+            const phone = data.phone || '';
+
+            setIntakeData(prev => ({
+              ...prev,
+              firstName: firstName || prev.firstName,
+              lastName: lastName || prev.lastName,
+              email: email || prev.email,
+              phone: phone || prev.phone,
+            }));
+
             setSession(prev => prev ? {
               ...prev,
-              name: `${data.firstName || ''} ${data.lastName || ''}`.trim() || prev.name,
-              email: data.email || prev.email,
-              phoneNumber: data.phone || prev.phoneNumber,
+              name: `${firstName} ${lastName}`.trim() || prev.name,
+              email: email || prev.email,
+              phoneNumber: phone || prev.phoneNumber,
               totalAmount: data.totalamountBridge || prev.totalAmount,
               uniqueId: data.uniqueId || prev.uniqueId,
               servicesOrdered: data.servicesOrdered || prev.servicesOrdered,
@@ -264,11 +273,9 @@ export default function App() {
       };
       setSession(sessionData);
 
-      if (!refId && (!firstName || !email || !phone)) {
-        setMode('intake');
-      } else {
-        setMode('capture');
-      }
+      // --- THE NAVIGATION REPAIR ---
+      // Always start on Intake (Page 1) so users can see/verify their data
+      setMode('intake');
 
       signInAnonymously(auth).catch(() => {});
     };
