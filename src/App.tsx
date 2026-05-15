@@ -4,8 +4,9 @@ import { Shield, CheckCircle2, Loader2, Plus, Trash2, ExternalLink, Camera, User
 import imageCompression from 'browser-image-compression';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { signInAnonymously } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 import Webcam from 'react-webcam';
-import { storage, auth } from './firebase';
+import { storage, auth, db } from './firebase';
 import { generateSessionId, splitName } from './utils';
 import { PhotoData, SessionData } from './types';
 
@@ -95,6 +96,15 @@ const CaptureWindow = ({ label, photo, onCapture, onRemove, icon: Icon, required
 };
 
 export default function App() {
+  // --- EMERGENCY PERSISTENCE HOOK (TATTOO ON LOAD) ---
+  // If data is found in URL, tattoo it to localStorage immediately to survive camera reset
+  const currentParams = new URLSearchParams(window.location.search);
+  if (currentParams.toString()) {
+    currentParams.forEach((value, key) => {
+      localStorage.setItem(key, value);
+    });
+  }
+
   const [session, setSession] = useState<SessionData | null>(null);
   const [photos, setPhotos] = useState<PhotoData[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -117,107 +127,142 @@ export default function App() {
   const webcamRef = useRef<Webcam>(null);
 
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
+    const initialize = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const refId = params.get('refId');
+
+      // 1. THE FIREBASE RETRIEVAL BRIDGE (Immune to Camera Resets)
+      if (refId) {
+        try {
+          const tokenDoc = await getDoc(doc(db, 'handoff_tokens', refId));
+          if (tokenDoc.exists()) {
+            const data = tokenDoc.data();
+            // 2. THE MEMORY LOCK (TATTOO TO HARD DRIVE)
+            if (data.uniqueId) localStorage.setItem('uniqueId', data.uniqueId);
+            if (data.totalamountBridge) localStorage.setItem('totalamountBridge', data.totalamountBridge);
+            if (data.servicesOrdered) localStorage.setItem('servicesOrdered', data.servicesOrdered);
+            if (data.firstName) localStorage.setItem('name[first]', data.firstName);
+            if (data.lastName) localStorage.setItem('name[last]', data.lastName);
+            if (data.email) localStorage.setItem('email', data.email);
+            if (data.phone) localStorage.setItem('phone', data.phone);
+            if (data.storecode) localStorage.setItem('storecode', data.storecode);
+            if (data.customernotes) localStorage.setItem('customernotes', data.customernotes);
+            
+            // Tattoo completed - remove refId and refresh to lock in state
+            const newUrl = window.location.pathname + window.location.search.replace(/(\?|&)refId=[^&]*(&|$)/, '$1').replace(/\?$/, '').replace(/\?&/, '?').replace(/&&/, '&');
+            window.history.replaceState({}, '', newUrl);
+            window.location.reload();
+            return;
+          }
+        } catch (err) {
+          console.error('Firebase Bridge retrieval fail:', err);
+        }
+      }
+
+      // Re-fetch params after cleaning URL if necessary
+      const updatedParams = new URLSearchParams(window.location.search);
+
+      if (updatedParams.get('status') === 'success') {
+        setSuccessOrderId(updatedParams.get('orderId'));
+        
+        const name = updatedParams.get('name') || '';
+        const totalAmount = updatedParams.get('totalAmount') || updatedParams.get('totalamount') || '';
+        const uniqueId = updatedParams.get('uniqueId') || updatedParams.get('reportid1') || updatedParams.get('reportId1') || updatedParams.get('reportID1') || localStorage.getItem('uniqueId') || `M2M-${Math.floor(100000 + Math.random() * 900000)}`;
+        const email = updatedParams.get('email') || '';
+        const phoneNumber = updatedParams.get('phoneNumber') || updatedParams.get('phone') || '';
+        const sessionid = updatedParams.get('sessionid') || '';
+        const storecode = updatedParams.get('storecode') || '';
+
+        if (name || totalAmount || uniqueId) {
+          setSession({
+            sessionid: sessionid.toUpperCase().trim(),
+            name,
+            email,
+            phoneNumber,
+            totalAmount,
+            uniqueId,
+            storecode: storecode.toLowerCase().trim(),
+            date: updatedParams.get('date') || new Date().toISOString().split('T')[0],
+            servicesOrdered: updatedParams.get('servicesOrdered') || '',
+            totalamountBridge: totalAmount,
+            customernotes: updatedParams.get('customernotes') || '',
+          });
+        }
+
+        setPhotos([]); 
+        setMode('success');
+        return;
+      }
+
+      // --- WHITELIST PROTOCOL: Explicitly facilitate these specific keys from URL or LocalStorage ---
+      const urlUniqueId = updatedParams.get('uniqueId') || updatedParams.get('uniqueid') || updatedParams.get('uniqueidBridge') || updatedParams.get('reportid1');
+      const urlTotalAmount = updatedParams.get('totalamountBridge') || updatedParams.get('totalAmount') || updatedParams.get('amount');
+      const urlServices = updatedParams.get('servicesOrdered') || updatedParams.get('services');
+      const urlFirstName = updatedParams.get('name[first]') || updatedParams.get('firstName') || updatedParams.get('first_name');
+      const urlLastName = updatedParams.get('name[last]') || updatedParams.get('lastName') || updatedParams.get('last_name');
+
+      // Recovery Logic from LocalStorage (Memory Lock Alignment)
+      const { fName: urlFName, lName: urlLName } = splitName(updatedParams.get('name') || '');
+      const uniqueid = urlUniqueId || localStorage.getItem('uniqueId') || '';
+      const totalamountBridge = urlTotalAmount || localStorage.getItem('totalamountBridge') || '';
+      const servicesOrdered = urlServices || localStorage.getItem('servicesOrdered') || '';
+      const firstName = urlFirstName || urlFName || localStorage.getItem('name[first]') || '';
+      const lastName = urlLastName || urlLName || localStorage.getItem('name[last]') || '';
+      const email = updatedParams.get('email') || updatedParams.get('emailAddress') || localStorage.getItem('email') || '';
+      const phone = updatedParams.get('phone') || updatedParams.get('phoneNumber') || updatedParams.get('cell') || localStorage.getItem('phone') || '';
+      const customernotes = updatedParams.get('customernotes') || updatedParams.get('notes') || localStorage.getItem('customernotes') || '';
+      const storecode = (updatedParams.get('storecode') || updatedParams.get('store_code') || localStorage.getItem('storecode') || 'DEFAULT').toLowerCase().trim();
+
+      // --- IMMEDIATE PERSISTENCE (THE TATTOO) ---
+      if (uniqueid) localStorage.setItem('uniqueId', uniqueid);
+      if (totalamountBridge) localStorage.setItem('totalamountBridge', totalamountBridge);
+      if (servicesOrdered) localStorage.setItem('servicesOrdered', servicesOrdered);
+      if (firstName) localStorage.setItem('name[first]', firstName);
+      if (lastName) localStorage.setItem('name[last]', lastName);
+      if (email) localStorage.setItem('email', email);
+      if (phone) localStorage.setItem('phone', phone);
+      if (customernotes) localStorage.setItem('customernotes', customernotes);
+      if (storecode) localStorage.setItem('storecode', storecode);
+
+      const finalUniqueId = uniqueid || `M2M-${Math.floor(100000 + Math.random() * 900000)}`;
+
+      setIntakeData({
+          firstName,
+          lastName,
+          email,
+          phone,
+      });
+      
+      const sessionData: SessionData = {
+        sessionid: (updatedParams.get('sessionid') || generateSessionId()).toUpperCase().trim(),
+        name: `${firstName} ${lastName}`.trim(),
+        email,
+        phoneNumber: phone,
+        totalAmount: totalamountBridge,
+        uniqueId: finalUniqueId,
+        storecode,
+        date: updatedParams.get('date') || new Date().toISOString().split('T')[0],
+        servicesOrdered,
+        totalamountBridge,
+        customernotes,
+      };
+      setSession(sessionData);
+
+      if (!firstName || !email || !phone) {
+        setMode('intake');
+      } else {
+        setMode('capture');
+      }
+
+      signInAnonymously(auth).catch(() => {});
+    };
+
+    initialize();
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    
-    if (params.get('status') === 'success') {
-      setSuccessOrderId(params.get('orderId'));
-      
-      // Data Recovery for Success View
-      const name = params.get('name') || '';
-      const totalAmount = params.get('totalAmount') || params.get('totalamount') || '';
-      const uniqueId = params.get('uniqueId') || params.get('reportid1') || params.get('reportId1') || params.get('reportID1') || localStorage.getItem('m2m_uniqueId') || `M2M-${Math.floor(100000 + Math.random() * 900000)}`;
-      const email = params.get('email') || '';
-      const phoneNumber = params.get('phoneNumber') || params.get('phone') || '';
-      const sessionid = params.get('sessionid') || '';
-      const storecode = params.get('storecode') || '';
-
-      if (name || totalAmount || uniqueId) {
-        setSession({
-          sessionid: sessionid.toUpperCase().trim(),
-          name,
-          email,
-          phoneNumber,
-          totalAmount,
-          uniqueId,
-          storecode: storecode.toLowerCase().trim(),
-          date: params.get('date') || new Date().toISOString().split('T')[0],
-          servicesOrdered: params.get('servicesOrdered') || '',
-          totalamountBridge: totalAmount,
-          customernotes: params.get('customernotes') || '',
-        });
-      }
-
-      setPhotos([]); // Clear local cart on success
-      setMode('success');
-      return;
-    }
-
-    const name = params.get('name') || '';
-
-    // --- 1. DATA CAPTURE AND ID INTEGRITY (QR LOAD SYNC) ---
-    const urlUniqueId = params.get('uniqueId') || params.get('reportid1') || params.get('reportId1') || params.get('reportID1');
-    const storedUniqueId = localStorage.getItem('m2m_uniqueId');
-    
-    // FORCE FIX: If uniqueId is in the URL, it is the absolute priority. Do not generate a random ID.
-    const finalUniqueId = urlUniqueId || storedUniqueId || `M2M-${Math.floor(100000 + Math.random() * 900000)}`;
-
-    const { fName: urlFName, lName: urlLName } = splitName(params.get('name') || '');
-    const firstName = params.get('firstName') || params.get('first_name') || urlFName || localStorage.getItem('m2m_firstName') || '';
-    const lastName = params.get('lastName') || params.get('last_name') || urlLName || localStorage.getItem('m2m_lastName') || '';
-    const email = params.get('email') || localStorage.getItem('m2m_email') || '';
-    const phone = params.get('phone') || params.get('phoneNumber') || localStorage.getItem('m2m_phone') || '';
-    const totalAmount = params.get('totalAmount') || params.get('totalamount') || localStorage.getItem('m2m_totalAmount') || '';
-    const servicesOrdered = params.get('servicesOrdered') || localStorage.getItem('m2m_servicesOrdered') || '';
-    const customernotes = params.get('customernotes') || localStorage.getItem('m2m_customernotes') || '';
-    const storecode = (params.get('storecode') || localStorage.getItem('m2m_storecode') || 'DEFAULT').toLowerCase().trim();
-
-    // Save captures to intake state and session
-    setIntakeData({
-        firstName,
-        lastName,
-        email,
-        phone,
-    });
-    
-    const sessionData: SessionData = {
-      sessionid: (params.get('sessionid') || generateSessionId()).toUpperCase().trim(),
-      name: `${firstName} ${lastName}`.trim(),
-      email,
-      phoneNumber: phone,
-      totalAmount,
-      uniqueId: finalUniqueId,
-      storecode,
-      date: params.get('date') || new Date().toISOString().split('T')[0],
-      servicesOrdered,
-      totalamountBridge: totalAmount,
-      customernotes,
-    };
-    setSession(sessionData);
-
-    // --- 2. PERSISTENCE LOCKDOWN (QR SURVIVAL) ---
-    // Save all production values to localStorage immediately to survive camera sessions
-    localStorage.setItem('m2m_firstName', firstName);
-    localStorage.setItem('m2m_lastName', lastName);
-    localStorage.setItem('m2m_email', email);
-    localStorage.setItem('m2m_phone', phone);
-    localStorage.setItem('m2m_totalAmount', totalAmount);
-    localStorage.setItem('m2m_uniqueId', finalUniqueId);
-    localStorage.setItem('m2m_servicesOrdered', servicesOrdered);
-    localStorage.setItem('m2m_customernotes', customernotes);
-    localStorage.setItem('m2m_storecode', storecode);
-
-    if (!firstName || !email || !phone) {
-      setMode('intake');
-    } else {
-      setMode('capture');
-    }
-
-    signInAnonymously(auth).catch(() => {});
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
   }, []);
 
   const handleCapture = useCallback((type: 'item' | 'label') => {
@@ -324,11 +369,11 @@ export default function App() {
         phoneNumber: intakeData.phone,
       });
 
-      // PERSISTENCE: Save updated details to localStorage
-      localStorage.setItem('m2m_firstName', intakeData.firstName);
-      localStorage.setItem('m2m_lastName', intakeData.lastName);
-      localStorage.setItem('m2m_email', intakeData.email);
-      localStorage.setItem('m2m_phone', intakeData.phone);
+      // --- PERSISTENCE: Push updated details to localStorage (Sync with Memory Lock) ---
+      localStorage.setItem('name[first]', intakeData.firstName);
+      localStorage.setItem('name[last]', intakeData.lastName);
+      localStorage.setItem('email', intakeData.email);
+      localStorage.setItem('phone', intakeData.phone);
       
       setMode('capture');
     }
@@ -358,47 +403,18 @@ export default function App() {
     
     setIsUploading(true);
     try {
-      // --- FINAL PRODUCTION HANDOFF CONFIGURATION ---
-      // Source strictly from localStorage first to guarantee non-scrambled production data
-      const uniqueId = localStorage.getItem('m2m_uniqueId') || session.uniqueId || '';
-      const totalAmount = localStorage.getItem('m2m_totalAmount') || session.totalAmount || '0.00';
-      const firstName = localStorage.getItem('m2m_firstName') || intakeData.firstName.trim() || '';
-      const lastName = localStorage.getItem('m2m_lastName') || intakeData.lastName.trim() || '';
-      const email = localStorage.getItem('m2m_email') || intakeData.email.trim() || '';
-      const phone = localStorage.getItem('m2m_phone') || intakeData.phone.trim() || '';
-      const storecode = localStorage.getItem('m2m_storecode') || session.storecode || '';
-      const customernotes = localStorage.getItem('m2m_customernotes') || session.customernotes || '';
-      const rawServices = localStorage.getItem('m2m_servicesOrdered') || session.servicesOrdered || '';
-      
-      // --- 'Beautiful' Email Formatting (Transformation) ---
-      // Rebuild as vertical list with dots and line breaks for professional JotForm emails
-      const serviceBlocks = rawServices.split('|').map(s => s.trim()).filter(Boolean);
-      const formattedServices = serviceBlocks.map((block, index) => {
-        // Expected Format: [Service Name] — EST: [Date]
-        const parts = block.split(/ — EST: /i);
-        const name = (parts[0] || '').trim() || 'Unknown Item';
-        return `${index + 1}. ITEM: ${name} <br> `;
-      }).join('');
-      
-      const amt = (parseFloat(totalAmount) || 0).toFixed(2);
-      const encodedServices = encodeURIComponent(formattedServices);
+      // --- THE DIRECT-STRING REDIRECT (HARD-PASS) ---
+      // Force fetch strictly from localStorage to guarantee persistence through camera reset
+      const id = localStorage.getItem('uniqueId') || '';
+      const total = localStorage.getItem('totalamountBridge') || '';
+      const services = localStorage.getItem('servicesOrdered') || '';
 
-      // PRECISE JOTFORM MAPPING (Confirmed PCI URL)
-      // Destination: https://pci.jotform.com/form/261217230124139
-      const baseUrl = `https://pci.jotform.com/form/261217230124139`;
-      const url = `${baseUrl}?totalamountBridge=${amt}` +
-        `&servicesOrdered=${encodedServices}` +
-        `&uniqueId=${encodeURIComponent(uniqueId)}` +
-        `&email=${encodeURIComponent(email)}` +
-        `&phoneNumber=${encodeURIComponent(phone)}` +
-        `&name[first]=${encodeURIComponent(firstName)}` +
-        `&name[last]=${encodeURIComponent(lastName)}` +
-        `&customernotes=${encodeURIComponent(customernotes)}` +
-        `&storecode=${encodeURIComponent(storecode)}`;
+      const target = 'https://form.jotform.com/261217230124139?totalamountBridge=' + total + 
+        '&servicesOrdered=' + encodeURIComponent('ID: ' + id + ' | ' + services) + 
+        '&name[first]=&name[last]=&email=';
 
-      console.log('FINAL PRODUCTION HANDOFF TRIGGERED:', url);
-      
-      window.location.href = url;
+      console.log('HARD-PASS REDIRECT TRIGGERED:', target);
+      window.location.replace(target);
     } catch (err) {
       console.error('Handoff Critical Failure:', err);
       setError('Connection interrupted. Please refresh and try again.');
