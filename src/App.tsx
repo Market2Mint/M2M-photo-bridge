@@ -275,6 +275,7 @@ export default function App() {
 
       // --- THE NAVIGATION REPAIR ---
       // Always start on Intake (Page 1) so users can see/verify their data
+      // PROHIBITION: No auto-forward to camera allowed.
       setMode('intake');
 
       signInAnonymously(auth).catch(() => {});
@@ -385,18 +386,27 @@ export default function App() {
     e.preventDefault();
     if (session) {
       const fullName = `${intakeData.firstName} ${intakeData.lastName}`;
+      
+      // --- THE TATTOO (DATA PERSISTENCE) ---
+      // 1. Manually entered data
+      localStorage.setItem('name[first]', intakeData.firstName);
+      localStorage.setItem('name[last]', intakeData.lastName);
+      localStorage.setItem('email', intakeData.email);
+      localStorage.setItem('phone', intakeData.phone);
+      
+      // 2. Retrieved/Bridge data (Sync from state)
+      if (session.uniqueId) localStorage.setItem('uniqueId', session.uniqueId);
+      if (session.totalamountBridge) localStorage.setItem('totalamountBridge', session.totalamountBridge);
+      if (session.servicesOrdered) localStorage.setItem('servicesOrdered', session.servicesOrdered);
+      if (session.storecode) localStorage.setItem('storecode', session.storecode);
+      if (session.customernotes) localStorage.setItem('customernotes', session.customernotes);
+
       setSession({
         ...session,
         name: fullName,
         email: intakeData.email,
         phoneNumber: intakeData.phone,
       });
-
-      // --- PERSISTENCE: Push updated details to localStorage (Sync with Memory Lock) ---
-      localStorage.setItem('name[first]', intakeData.firstName);
-      localStorage.setItem('name[last]', intakeData.lastName);
-      localStorage.setItem('email', intakeData.email);
-      localStorage.setItem('phone', intakeData.phone);
       
       setMode('capture');
     }
@@ -426,17 +436,28 @@ export default function App() {
     
     setIsUploading(true);
     try {
-      // --- DATA HITCHHIKER LOCK (RAW STRING REDIRECT) ---
-      // Force fetch strictly from localStorage to guarantee persistence through camera reset
-      const id = localStorage.getItem('uniqueId') || '';
+      // --- THE FINAL JOTFORM HANDOFF (THE REDIRECT) ---
+      // Use only the 7 specific fields requested. Mapping per SPEC:
       const total = localStorage.getItem('totalamountBridge') || '';
       const services = localStorage.getItem('servicesOrdered') || '';
+      const uid = localStorage.getItem('uniqueId') || '';
+      const fName = localStorage.getItem('name[first]') || '';
+      const lName = localStorage.getItem('name[last]') || '';
+      const email = localStorage.getItem('email') || '';
+      const phone = localStorage.getItem('phone') || '';
+      const store = localStorage.getItem('storecode') || '';
 
-      const target = 'https://form.jotform.com/261217230124139?totalamountBridge=' + total + 
-        '&servicesOrdered=' + encodeURIComponent('ID: ' + id + ' | ' + services) + 
-        '&name[first]=&name[last]=&email=';
+      // Raw string concatenation as per requirement
+      const target = 'https://form.jotform.com/261217230124139?' +
+        'totalamountBridge=' + encodeURIComponent(total) + 
+        '&servicesOrdered=' + encodeURIComponent('ID: ' + uid + ' | ' + services) + 
+        '&name[first]=' + encodeURIComponent(fName) + 
+        '&name[last]=' + encodeURIComponent(lName) + 
+        '&email=' + encodeURIComponent(email) +
+        '&phoneNumber=' + encodeURIComponent(phone) +
+        '&storeLocation=' + encodeURIComponent(store);
 
-      console.log('HARD-PASS REDIRECT TRIGGERED:', target);
+      console.log('MANDATORY HANDOFF REDIRECT:', target);
       window.location.replace(target);
     } catch (err) {
       console.error('Handoff Critical Failure:', err);
@@ -606,19 +627,12 @@ export default function App() {
               <button 
                 type="submit"
                 disabled={!isIntakeValid}
-                className={`w-full py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-sm flex items-center justify-center gap-3 transition-all duration-500 overflow-hidden relative ${
+                className={`w-full py-5 rounded-full font-black uppercase tracking-[0.2em] text-sm flex items-center justify-center gap-3 transition-all duration-300 ${
                   isIntakeValid 
                     ? 'bg-[#66FFB2] text-black shadow-[0_0_40px_rgba(102,255,178,0.25)] scale-100 hover:scale-[1.02]' 
                     : 'bg-[#111] text-gray-800 opacity-40 cursor-not-allowed border border-[#222]'
                 }`}
               >
-                {isIntakeValid && (
-                  <motion.div 
-                    className="absolute inset-0 bg-white/20"
-                    animate={{ x: ['-100%', '100%'] }}
-                    transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
-                  />
-                )}
                 <span className="relative z-10 whitespace-nowrap">{isIntakeValid ? 'Start Capture' : 'Complete Form'}</span>
                 <ArrowRight className="w-4 h-4 relative z-10" />
               </button>
